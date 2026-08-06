@@ -80,18 +80,7 @@ export default function QuestBoard() {
 
   /** Called by the detail sheet after it queues a completion locally. */
   const onCompleted = useCallback(async (pqId: string) => {
-    await localDB.myQuests.update(pqId, { status: "completed" });
-    // auto-refill: activate the next queued quest so the pool stays at 5
-    const next = await localDB.myQuests
-      .where("event_id").equals(eventId)
-      .and((q) => q.status === "queued")
-      .first();
-    if (next) {
-      await localDB.myQuests.update(next.id, {
-        status: "active",
-        activated_at: new Date().toISOString(),
-      });
-    }
+   await localDB.myQuests.update(pqId, { status: "completed" });
     // unlock legendary at the trigger point
     const all = await localDB.myQuests.where("event_id").equals(eventId).toArray();
     const done = all.filter((q) => q.status === "completed").length;
@@ -129,8 +118,7 @@ export default function QuestBoard() {
         <section className="mt-10 text-center">
           <h2 className="text-2xl">Ready to play?</h2>
           <p className="mx-auto mt-2 max-w-xs text-paper/70">
-            You&apos;ll draw 10 quests from the pack. Five go live right away — finish
-            one and the next steps up. One hidden Legendary Quest is riding along.
+            You&apos;ll draw 10 quests — all active from the start. Complete any of them in any order. One hidden Legendary Quest is riding along.
           </p>
           <button className="btn-primary mt-6 w-full" onClick={drawQuests} disabled={drawing || event?.status !== "active"}>
             {drawing ? "Shuffling the deck…" : event?.status === "active" ? "Draw my quests" : "Waiting for the host to start…"}
