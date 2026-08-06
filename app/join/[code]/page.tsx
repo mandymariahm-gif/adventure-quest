@@ -70,5 +70,13 @@ export default async function JoinPage({ params }: { params: { code: string } })
     await admin.from("event_participants").insert({ event_id: event.id, user_id: user.id, role: "participant" });
   }
 
-  redirect(event.status === "ended" ? `/scrapbook/${event.id}` : `/quests/${event.id}`);
+  const destination = event.status === "ended" ? `/scrapbook/${event.id}` : `/quests/${event.id}`;
+
+return (
+  <script
+    dangerouslySetInnerHTML={{
+      __html: `window.location.replace(${JSON.stringify(destination)})`,
+    }}
+  />
+);
 }
