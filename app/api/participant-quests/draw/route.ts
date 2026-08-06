@@ -56,7 +56,7 @@ export async function POST(request: Request) {
       event_participant_id: participant.id,
       quest_id: legendary.id,
       status: "locked",
-      activated_at: null,
+      activated_at: null as unknown as string,
     });
   }
 
