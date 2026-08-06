@@ -31,7 +31,9 @@ export default async function Dashboard() {
         <Link href="/profile" className="btn-ghost !min-h-[40px] !px-4 text-sm">Profile</Link>
       </header>
 
-      <Link href="/events/new" className="btn-primary w-full">+ Create new event</Link>
+      {user.id === process.env.NEXT_PUBLIC_HOST_USER_ID && (
+  <Link href="/events/new" className="btn-primary w-full">+ Create new event</Link>
+)}/Link>
 
       <section className="mt-8">
         <h2 className="font-display text-sm uppercase tracking-[0.25em] text-fern">My events</h2>
