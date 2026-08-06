@@ -1,0 +1,120 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ---------------------------------------------------------------------------
+   Adventure Quest design system
+   Palette: pine #14291F · moss #23402F · fern #6FA36B · amber #E8A33D
+            lantern #F6C453 · paper #F3EAD8 · ink #1D1610
+   Display: Bricolage Grotesque (festival-poster energy, used with restraint)
+   Body:    Instrument Sans
+   Signature: quest cards as perforated zoo admission tickets; scrapbook
+   photos as taped polaroids. Everything else stays quiet.
+--------------------------------------------------------------------------- */
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  @apply bg-pine text-paper font-body antialiased;
+  background-image: radial-gradient(
+      ellipse 90% 60% at 50% -10%,
+      rgba(111, 163, 107, 0.14),
+      transparent
+    );
+  min-height: 100dvh;
+}
+
+h1, h2, h3 {
+  @apply font-display;
+}
+
+/* --- ticket-stub quest card (the signature element) ---------------------- */
+.ticket {
+  @apply relative bg-paper text-ink rounded-xl shadow-card;
+}
+.ticket::before,
+.ticket::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #14291f; /* punch out to page background */
+  transform: translateY(-50%);
+}
+.ticket::before { left: -9px; }
+.ticket::after { right: -9px; }
+
+.ticket-tear {
+  border-top: 2px dashed rgba(29, 22, 16, 0.25);
+}
+
+.ticket-legendary {
+  background: linear-gradient(135deg, #f6c453 0%, #e8a33d 55%, #d98e2b 100%);
+}
+
+/* --- polaroid for scrapbook photos --------------------------------------- */
+.polaroid {
+  @apply bg-paper p-2 pb-8 shadow-tape;
+  transform: rotate(var(--tilt, -1.5deg));
+}
+.polaroid img { @apply block w-full object-cover; aspect-ratio: 1 / 1; }
+.polaroid-caption {
+  @apply mt-2 text-center text-xs text-ink/80;
+}
+
+/* washi tape strip */
+.tape {
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  width: 84px;
+  height: 22px;
+  transform: translateX(-50%) rotate(-2deg);
+  background: rgba(232, 163, 61, 0.55);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+}
+
+/* --- controls -------------------------------------------------------------
+   Party-proof: large touch targets, obvious focus, no tiny taps. */
+.btn {
+  @apply inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl px-5
+    font-display text-base font-semibold transition-transform
+    active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none;
+}
+.btn-primary { @apply btn bg-amber text-ink; }
+.btn-ghost { @apply btn bg-white/10 text-paper; }
+.btn-paper { @apply btn bg-ink text-paper; }
+
+.field {
+  @apply w-full min-h-[48px] rounded-xl bg-white/10 px-4 py-3 text-paper
+    placeholder:text-paper/40 border border-white/10;
+}
+.field-paper {
+  @apply w-full min-h-[48px] rounded-xl bg-white px-4 py-3 text-ink
+    placeholder:text-ink/40 border border-ink/15;
+}
+
+label { @apply block text-sm font-medium text-paper/80 mb-1; }
+
+*:focus-visible {
+  outline: 3px solid #f6c453;
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* subtle offline chip */
+.sync-chip {
+  @apply fixed bottom-20 left-1/2 z-50 -translate-x-1/2 rounded-full bg-ink/90
+    px-4 py-2 text-sm text-lantern shadow-tape;
+}
