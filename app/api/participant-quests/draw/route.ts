@@ -1,12 +1,16 @@
 import { NextResponse } from "next/server";
 import { supabaseServer, supabaseAdmin } from "@/lib/supabase/server";
 
-const DRAW = 10;
-const ACTIVE = 5;
+const CATEGORY_QUOTAS: Record<string, number> = {
+  beer:         3,
+  zoo:          2,
+  creative:     2,
+  adventure:    1,
+  friendship:   1,
+  photography:  1,
+};
+const TOTAL_DRAW = 10;
 
-/** Draw quests for the signed-in participant:
- *  10 random regular quests (5 active, 5 queued) + 1 hidden Legendary.
- *  Idempotent — drawing twice returns the existing hand. */
 export async function POST(request: Request) {
   const supabase = supabaseServer();
   const { data: { user } } = await supabase.auth.getUser();
@@ -27,7 +31,6 @@ export async function POST(request: Request) {
   if (!participant)
     return NextResponse.json({ error: "Join the event first." }, { status: 403 });
 
-  // already drawn? return the existing hand (idempotent)
   const { data: existing } = await admin
     .from("participant_quests")
     .select("id, quest_id, status, drawn_at, activated_at, quests(*)")
@@ -39,24 +42,49 @@ export async function POST(request: Request) {
   const { data: pool } = await admin
     .from("quests").select("*").eq("quest_pack_id", event.quest_pack_id);
   if (!pool || pool.length === 0)
-    return NextResponse.json({ error: "This quest pack has no quests. Run the seed script." }, { status: 500 });
+    return NextResponse.json({ error: "No quests found. Run the seed script." }, { status: 500 });
 
-  const regular = shuffle(pool.filter((q) => !q.is_legendary)).slice(0, DRAW);
+  const regular = pool.filter((q) => !q.is_legendary);
   const legendary = shuffle(pool.filter((q) => q.is_legendary))[0] ?? null;
 
+  const selected: typeof regular = [];
+  const overflow: typeof regular = [];
+
+  const byCategory: Record<string, typeof regular> = {};
+  for (const q of regular) {
+    const cat = q.category ?? "other";
+    if (!byCategory[cat]) byCategory[cat] = [];
+    byCategory[cat].push(q);
+  }
+
+  for (const [cat, quota] of Object.entries(CATEGORY_QUOTAS)) {
+    const bucket = shuffle(byCategory[cat] ?? []);
+    selected.push(...bucket.slice(0, quota));
+    overflow.push(...bucket.slice(quota));
+  }
+
+  for (const [cat, bucket] of Object.entries(byCategory)) {
+    if (!(cat in CATEGORY_QUOTAS)) overflow.push(...bucket);
+  }
+
+  const remaining = TOTAL_DRAW - selected.length;
+  if (remaining > 0) selected.push(...shuffle(overflow).slice(0, remaining));
+
   const now = new Date().toISOString();
-  const rows = regular.map((q, i) => ({
-    event_participant_id: participant.id,
-    quest_id: q.id,
-    status: i < ACTIVE ? "active" : "queued",
-    activated_at: i < ACTIVE ? now : null,
-  }));
+  const rows: { event_participant_id: string; quest_id: string; status: string; activated_at: string | null }[] =
+    selected.slice(0, TOTAL_DRAW).map((q) => ({
+      event_participant_id: participant.id,
+      quest_id: q.id,
+      status: "active",
+      activated_at: now,
+    }));
+
   if (legendary) {
     rows.push({
       event_participant_id: participant.id,
       quest_id: legendary.id,
       status: "locked",
-      activated_at: null as unknown as string,
+      activated_at: null,
     });
   }
 
