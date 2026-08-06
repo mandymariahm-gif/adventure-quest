@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
 import type { EventRow } from "@/lib/types";
+import InviteCodeInput from "@/components/ui/InviteCodeInput";
 
 export const dynamic = "force-dynamic";
 
@@ -32,16 +33,22 @@ export default async function Dashboard() {
       </header>
 
       {user.id === process.env.NEXT_PUBLIC_HOST_USER_ID && (
-  <Link href="/events/new" className="btn-primary w-full">+ Create new event</Link>
-)}
+        <Link href="/events/new" className="btn-primary w-full">+ Create new event</Link>
+      )}
 
       <section className="mt-8">
         <h2 className="font-display text-sm uppercase tracking-[0.25em] text-fern">My events</h2>
+
+        {/* ✅ FIX #5 — empty state now has an invite code input so participants aren't stuck */}
         {current.length === 0 && (
-          <p className="mt-3 text-sm text-paper/60">
-            No events yet. Create one, or open an invite link a friend sent you.
-          </p>
+          <>
+            <p className="mt-3 text-sm text-paper/60">
+              No events yet — join one with an invite link from your host.
+            </p>
+            <InviteCodeInput />
+          </>
         )}
+
         <ul className="mt-3 flex flex-col gap-3">
           {current.map((e) => (
             <li key={e.id} className="ticket p-4">
@@ -92,4 +99,3 @@ export default async function Dashboard() {
     </main>
   );
 }
-
