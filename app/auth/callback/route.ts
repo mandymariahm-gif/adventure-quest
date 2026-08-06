@@ -26,6 +26,7 @@ export async function GET(request: Request) {
       }
     );
 
+    
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
       const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || origin;

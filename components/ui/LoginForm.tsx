@@ -1,65 +1,70 @@
 "use client";
 import { useState } from "react";
 import { supabaseBrowser } from "@/lib/supabase/client";
+import { useRouter } from "next/navigation";
 
 export default function LoginForm({ next = "/dashboard" }: { next?: string }) {
+  const router = useRouter();
   const [email, setEmail] = useState("");
-  const [state, setState] = useState<"idle" | "sending" | "sent" | "error">("idle");
-  const [message, setMessage] = useState("");
+  const [password, setPassword] = useState("");
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  async function sendLink() {
-    if (!email.includes("@")) {
-      setState("error");
-      setMessage("Enter the email address you'd like your sign-in link sent to.");
-      return;
-    }
-    setState("sending");
+  async function handle() {
+    setLoading(true);
+    setError("");
     const supabase = supabaseBrowser();
-    const site = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: `${site}/auth/callback?next=${encodeURIComponent(next)}` },
-    });
-    if (error) {
-      setState("error");
-      setMessage(error.message);
-    } else {
-      setState("sent");
-    }
-  }
 
-  if (state === "sent") {
-    return (
-      <div className="ticket p-6 text-center">
-        <h2 className="text-xl">Check your email</h2>
-        <p className="mt-2 text-sm text-ink/70">
-          We sent a sign-in link to <strong>{email}</strong>. Tap it on this
-          device and you&apos;re in — no password to remember at a party.
-        </p>
-      </div>
-    );
+    if (isSignUp) {
+      const { error } = await supabase.auth.signUp({ email, password });
+      if (error) { setError(error.message); setLoading(false); return; }
+      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+      if (signInError) { setError(signInError.message); setLoading(false); return; }
+    } else {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) { setError(error.message); setLoading(false); return; }
+    }
+
+    router.push(next);
+    router.refresh();
   }
 
   return (
     <div className="flex flex-col gap-3">
-      <label htmlFor="email">Email</label>
-      <input
-        id="email"
-        type="email"
-        inputMode="email"
-        autoComplete="email"
-        className="field"
-        placeholder="you@example.com"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        onKeyDown={(e) => e.key === "Enter" && sendLink()}
-      />
-      <button className="btn-primary" onClick={sendLink} disabled={state === "sending"}>
-        {state === "sending" ? "Sending…" : "Send magic link"}
+      <div>
+        <label htmlFor="email">Email</label>
+        <input
+          id="email"
+          type="email"
+          className="field"
+          placeholder="you@example.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+      </div>
+      <div>
+        <label htmlFor="password">Password</label>
+        <input
+          id="password"
+          type="password"
+          className="field"
+          placeholder={isSignUp ? "Choose a password (6+ characters)" : "Your password"}
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && handle()}
+        />
+      </div>
+      {error && <p className="text-red-400 text-sm">{error}</p>}
+      <button className="btn-primary" onClick={handle} disabled={loading}>
+        {loading ? "..." : isSignUp ? "Create account" : "Sign in"}
       </button>
-      {state === "error" && (
-        <p role="alert" className="text-sm text-lantern">{message}</p>
-      )}
+      <button
+        className="btn-ghost text-sm"
+        onClick={() => { setIsSignUp(!isSignUp); setError(""); }}
+      >
+        {isSignUp ? "Already have an account? Sign in" : "New here? Create an account"}
+      </button>
     </div>
   );
 }
