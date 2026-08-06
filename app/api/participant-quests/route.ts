@@ -76,7 +76,7 @@ export async function POST(request: Request) {
 
   // All 10 are active — no queue
   const now = new Date().toISOString();
-  const rows = selected.slice(0, TOTAL_DRAW).map((q) => ({
+  const rows: { event_participant_id: string; quest_id: string; status: string; activated_at: string | null }[] = selected.slice(0, TOTAL_DRAW).map((q) => ({
     event_participant_id: participant.id,
     quest_id: q.id,
     status: "active",
