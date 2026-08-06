@@ -59,24 +59,32 @@ export default function QuestBoard() {
   const doneList = quests.filter((q) => q.status === "completed");
 
   async function drawQuests() {
-    setDrawing(true);
-    setError("");
-    try {
-      const res = await fetch("/api/participant-quests/draw", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ eventId }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Couldn't draw quests.");
-      await localDB.myQuests.bulkPut(data.quests);
-      await refreshLocal();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't draw quests — check your connection and try again.");
-    } finally {
-      setDrawing(false);
-    }
+  setDrawing(true);
+  setError("");
+
+  // ✅ FIX #5 — clear offline message before trying the network
+  if (!navigator.onLine) {
+    setError("You need a connection to draw your first quests — find some signal and try again!");
+    setDrawing(false);
+    return;
   }
+
+  try {
+    const res = await fetch("/api/participant-quests/draw", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ eventId }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error ?? "Couldn't draw quests.");
+    await localDB.myQuests.bulkPut(data.quests);
+    await refreshLocal();
+  } catch (e) {
+    setError(e instanceof Error ? e.message : "Couldn't draw quests — check your connection and try again.");
+  } finally {
+    setDrawing(false);
+  }
+}
 
   /** Called by the detail sheet after it queues a completion locally. */
   const onCompleted = useCallback(async (pqId: string) => {

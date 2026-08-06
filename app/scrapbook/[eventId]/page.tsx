@@ -24,6 +24,7 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
 
   if (!event) redirect("/dashboard");
 
+  // Event hasn't ended yet — send them back to play
   if (event.status !== "ended") {
     return (
       <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-4 p-6 text-center">
@@ -37,10 +38,27 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
     );
   }
 
+  // Fetch scrapbook once, after confirming the event has ended
   const { data: scrapbook } = await admin
     .from("scrapbooks").select("stats_json, champion_user_id, generated_at")
     .eq("event_id", params.eventId).maybeSingle();
-  const stats = (scrapbook?.stats_json ?? null) as ScrapbookStats | null;
+
+  // ✅ FIX #7 — event ended but scrapbook not generated yet
+  if (!scrapbook) {
+    return (
+      <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-4 p-6 text-center">
+        <h1 className="text-3xl">Assembling your scrapbook…</h1>
+        <p className="text-paper/70">
+          The night is being gathered into pages. This usually takes less than a
+          minute — refresh in a moment and it'll be ready.
+        </p>
+        <Link href={`/scrapbook/${params.eventId}`} className="btn-primary">Refresh</Link>
+        <Link href="/dashboard" className="btn-ghost">Back to dashboard</Link>
+      </main>
+    );
+  }
+
+  const stats = (scrapbook.stats_json ?? null) as ScrapbookStats | null;
 
   const { data: capsule } = await admin
     .from("time_capsules").select("id, unlock_at, favorite_beer, favorite_brewery, funniest_moment, biggest_surprise, favorite_animal, prediction_next_year, personal_goal")
@@ -101,7 +119,7 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
                 <img src={p.photo_url!} alt={`${p.display_name} — ${p.quest_title}`} loading="lazy" />
                 <figcaption className="polaroid-caption">
                   {p.quest_title}
-                  {p.text_note ? ` — “${p.text_note}”` : ""}
+                  {p.text_note ? ` — "${p.text_note}"` : ""}
                 </figcaption>
               </figure>
             ))}
@@ -122,7 +140,7 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
                   <strong>{t.display_name}</strong> — {t.is_legendary ? "⭐ " : ""}{t.quest_title}
                   <span className="text-ink/50"> · {t.points} pts</span>
                 </p>
-                {t.text_note && <p className="text-sm italic text-ink/60">“{t.text_note}”</p>}
+                {t.text_note && <p className="text-sm italic text-ink/60">"{t.text_note}"</p>}
               </li>
             ))}
           </ol>
