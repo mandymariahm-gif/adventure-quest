@@ -2,7 +2,7 @@
   "name": "Brew at the Zoo",
   "slug": "brew-at-the-zoo",
   "description": "Complete any 10 quests to enter the running for Brew at the Zoo Champion. A photo, screenshot, or group verification is required for all quests.",
-  "version": "2.0.0",
+  "version": 2,
   "quests": [
     {
       "slug": "batz-beer-underrated",
