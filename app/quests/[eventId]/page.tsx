@@ -5,9 +5,10 @@ import { useParams } from "next/navigation";
 import { supabaseBrowser } from "@/lib/supabase/client";
 import { localDB, type LocalQuestState } from "@/lib/offline/db";
 import QuestDetailSheet from "@/components/quest/QuestDetailSheet";
+import TimeCapsulePreview from "@/components/quest/TimeCapsulePreview";
 import type { EventRow } from "@/lib/types";
 
-const LEGENDARY_TRIGGER = 5; // completions before the hidden Legendary unlocks
+const LEGENDARY_TRIGGER = 5;
 
 export default function QuestBoard() {
   const { eventId } = useParams<{ eventId: string }>();
@@ -22,7 +23,6 @@ export default function QuestBoard() {
     setQuests(rows);
   }, [eventId]);
 
-  // Load event + hydrate local quest state from server when online.
   useEffect(() => {
     void refreshLocal();
     const supabase = supabaseBrowser();
@@ -59,37 +59,34 @@ export default function QuestBoard() {
   const doneList = quests.filter((q) => q.status === "completed");
 
   async function drawQuests() {
-  setDrawing(true);
-  setError("");
+    setDrawing(true);
+    setError("");
 
-  // ✅ FIX #5 — clear offline message before trying the network
-  if (!navigator.onLine) {
-    setError("You need a connection to draw your first quests — find some signal and try again!");
-    setDrawing(false);
-    return;
+    if (!navigator.onLine) {
+      setError("You need a connection to draw your first quests — find some signal and try again!");
+      setDrawing(false);
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/participant-quests/draw", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ eventId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Couldn't draw quests.");
+      await localDB.myQuests.bulkPut(data.quests);
+      await refreshLocal();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't draw quests — check your connection and try again.");
+    } finally {
+      setDrawing(false);
+    }
   }
 
-  try {
-    const res = await fetch("/api/participant-quests/draw", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ eventId }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error ?? "Couldn't draw quests.");
-    await localDB.myQuests.bulkPut(data.quests);
-    await refreshLocal();
-  } catch (e) {
-    setError(e instanceof Error ? e.message : "Couldn't draw quests — check your connection and try again.");
-  } finally {
-    setDrawing(false);
-  }
-}
-
-  /** Called by the detail sheet after it queues a completion locally. */
   const onCompleted = useCallback(async (pqId: string) => {
-   await localDB.myQuests.update(pqId, { status: "completed" });
-    // unlock legendary at the trigger point
+    await localDB.myQuests.update(pqId, { status: "completed" });
     const all = await localDB.myQuests.where("event_id").equals(eventId).toArray();
     const done = all.filter((q) => q.status === "completed").length;
     const leg = all.find((q) => q.is_legendary && q.status === "locked");
@@ -113,7 +110,8 @@ export default function QuestBoard() {
   return (
     <main className="mx-auto max-w-md p-5 pb-28">
       <header className="flex items-center justify-between py-3">
-        <div>
+        <Link href="/dashboard" className="btn-ghost !min-h-[44px] !px-3 text-sm">← Back</Link>
+        <div className="text-center">
           <h1 className="text-xl leading-tight">{event?.name ?? "Quest Board"}</h1>
           <p className="text-sm text-paper/60">{completedCount} done</p>
         </div>
@@ -199,6 +197,9 @@ export default function QuestBoard() {
               </ul>
             </section>
           )}
+
+          {/* ✅ FIX #3 — time capsule question preview during the event */}
+          <TimeCapsulePreview />
         </>
       )}
 
