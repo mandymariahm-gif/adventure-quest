@@ -70,25 +70,15 @@ export async function GET(request: Request) {
     });
   }
 
-  // Fetch side quests
-  const { data: sideQuests } = await admin
+ // Fetch side quests
+  const { data: sideQuests, error: sqError } = await admin
     .from("side_quests")
     .select("id, created_at, photo_url, title, user_id")
     .eq("event_id", eventId)
     .order("created_at", { ascending: false })
     .limit(50);
 
-  const sideQuestItems = (sideQuests ?? []).map((s: any) => ({
-    id: s.id,
-    completed_at: s.created_at,
-    photo_url: s.photo_url,
-    text_note: null,
-    quest_title: s.title,
-    display_name: userMap.get(s.user_id) ?? "Someone",
-    points: 0,
-    is_legendary: false,
-    is_side_quest: true,
-  }));
+  if (sqError) return NextResponse.json({ error: sqError.message, where: "side_quests" }, { status: 500 });
 
   // Merge and sort
   const activity = [...completionItems, ...sideQuestItems]
