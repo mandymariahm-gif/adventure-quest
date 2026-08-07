@@ -198,14 +198,16 @@ export default function QuestBoard() {
             </section>
           )}
 
-          {/* ✅ FIX #3 — time capsule question preview during the event */}
+          {/* Time capsule preview */}
           <TimeCapsulePreview />
         </>
       )}
 
+      {/* ✅ Activity added to bottom nav */}
       <nav className="fixed inset-x-0 bottom-0 border-t border-white/10 bg-pine/95 backdrop-blur" aria-label="Main">
         <div className="mx-auto flex max-w-md justify-around py-2">
           <span className="btn-ghost !min-h-[44px] !bg-white/15 text-sm">Quests</span>
+          <Link className="btn-ghost !min-h-[44px] text-sm" href={`/activity/${eventId}`}>Activity</Link>
           <Link className="btn-ghost !min-h-[44px] text-sm" href={`/scrapbook/${eventId}`}>Scrapbook</Link>
           <Link className="btn-ghost !min-h-[44px] text-sm" href="/profile">Profile</Link>
         </div>

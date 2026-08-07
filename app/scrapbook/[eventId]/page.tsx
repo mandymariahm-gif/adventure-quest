@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { supabaseServer, supabaseAdmin } from "@/lib/supabase/server";
 import type { ScrapbookStats } from "@/lib/types";
-import TimeCapsuleCard from "@/components/scrapbook/TimeCapsuleCard";
+import TimeCapsuleCard from "@/components/quest/TimeCapsuleCard";
 import ShareButton from "@/components/scrapbook/ShareButton";
 
 export const dynamic = "force-dynamic";
