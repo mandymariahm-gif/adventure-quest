@@ -32,7 +32,11 @@ export default function QuestBoard() {
     (async () => {
       if (!navigator.onLine) return;
       try {
-        const res = await fetch(`/api/participant-quests?eventId=${eventId}`);
+        // ✅ FIX — send Bearer token with GET request
+        const { data: { session } } = await supabase.auth.getSession();
+        const res = await fetch(`/api/participant-quests?eventId=${eventId}`, {
+          headers: session?.access_token ? { "Authorization": `Bearer ${session.access_token}` } : {},
+        });
         if (!res.ok) return;
         const { quests: serverQuests } = await res.json();
         if (Array.isArray(serverQuests) && serverQuests.length > 0) {
@@ -58,7 +62,7 @@ export default function QuestBoard() {
   const legendaryUnlocked = completedCount >= LEGENDARY_TRIGGER;
   const doneList = quests.filter((q) => q.status === "completed");
 
- async function drawQuests() {
+  async function drawQuests() {
     setDrawing(true);
     setError("");
 
@@ -69,7 +73,6 @@ export default function QuestBoard() {
     }
 
     try {
-      // ✅ FIX — send Bearer token so the server can verify auth
       const { data: { session } } = await supabaseBrowser().auth.getSession();
       if (!session?.access_token) {
         setError("You need to be signed in to draw quests.");
@@ -209,12 +212,10 @@ export default function QuestBoard() {
             </section>
           )}
 
-          {/* Time capsule preview */}
           <TimeCapsulePreview />
         </>
       )}
 
-      {/* ✅ Activity added to bottom nav */}
       <nav className="fixed inset-x-0 bottom-0 border-t border-white/10 bg-pine/95 backdrop-blur" aria-label="Main">
         <div className="mx-auto flex max-w-md justify-around py-2">
           <span className="btn-ghost !min-h-[44px] !bg-white/15 text-sm">Quests</span>
