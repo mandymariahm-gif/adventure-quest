@@ -72,6 +72,7 @@ export async function GET(request: Request) {
   const { data: sideQuests, error: sqError } = await admin
     .from("side_quests")
     .select("id, created_at, photo_url, title, user_id, event_id")
+    .eq("event_id", eventId)
     .order("created_at", { ascending: false })
     .limit(50);
 
