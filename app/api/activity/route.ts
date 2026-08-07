@@ -17,17 +17,18 @@ export async function GET(request: Request) {
 
   if (!participants || participants.length === 0) return NextResponse.json({ activity: [] });
 
-  const userIds = participants.map((p) => p.user_id);
+  const userIds = participants.map((p: any) => p.user_id);
   const { data: users } = await admin
     .from("users")
     .select("id, display_name")
     .in("id", userIds);
 
-  const userMap = new Map((users ?? []).map((u) => [u.id, u.display_name ?? "Someone"]));
-  const participantMap = new Map(participants.map((p) => [p.id, userMap.get(p.user_id) ?? "Someone"]));
-  const participantIds = participants.map((p) => p.id);
+  const userMap = new Map((users ?? []).map((u: any) => [u.id, u.display_name ?? "Someone"]));
+  const participantMap = new Map(participants.map((p: any) => [p.id, userMap.get(p.user_id) ?? "Someone"]));
+  const participantIds = participants.map((p: any) => p.id);
 
   let completionItems: any[] = [];
+
   const { data: pquests } = await admin
     .from("participant_quests")
     .select("id, event_participant_id, quests ( title, points, is_legendary )")
@@ -43,6 +44,7 @@ export async function GET(request: Request) {
   );
 
   const pquestIds = (pquests ?? []).map((pq: any) => pq.id);
+
   if (pquestIds.length > 0) {
     const { data: completions } = await admin
       .from("quest_completions")
@@ -74,4 +76,25 @@ export async function GET(request: Request) {
     .order("created_at", { ascending: false })
     .limit(50);
 
-  if (sqError) return NextResponse.json({ error: sqError.message, where:
+  if (sqError) {
+    return NextResponse.json({ error: sqError.message, where: "side_quests" }, { status: 500 });
+  }
+
+  const sideQuestItems = (sideQuests ?? []).map((s: any) => ({
+    id: s.id,
+    completed_at: s.created_at,
+    photo_url: s.photo_url,
+    text_note: null,
+    quest_title: s.title,
+    display_name: userMap.get(s.user_id) ?? "Someone",
+    points: 0,
+    is_legendary: false,
+    is_side_quest: true,
+  }));
+
+  const activity = [...completionItems, ...sideQuestItems]
+    .sort((a, b) => new Date(b.completed_at).getTime() - new Date(a.completed_at).getTime())
+    .slice(0, 80);
+
+  return NextResponse.json({ activity });
+}
