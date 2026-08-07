@@ -1,27 +1,14 @@
-import { NextResponse, type NextRequest } from "next/server";
-import { createServerClient } from "@supabase/ssr";
-import { supabaseAdmin } from "@/lib/supabase/server";
-import { cookies } from "next/headers";
+import { NextResponse } from "next/server";
+import { supabaseServer, supabaseAdmin } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(request: NextRequest) {
+export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const eventId = searchParams.get("eventId");
   if (!eventId) return NextResponse.json({ error: "Missing eventId" }, { status: 400 });
 
-  // Use cookies() to properly read the session in an API route
-  const cookieStore = cookies();
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) { return cookieStore.get(name)?.value; },
-      },
-    }
-  );
-
+  const supabase = supabaseServer();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -34,26 +21,25 @@ export async function GET(request: NextRequest) {
     .eq("event_id", eventId)
     .eq("user_id", user.id)
     .maybeSingle();
-
   if (!membership) return NextResponse.json({ error: "Not a participant" }, { status: 403 });
 
-  // Fetch all participants in the event with their profiles
+  // Fetch all participants with display names from users table
   const { data: participants } = await admin
     .from("event_participants")
-    .select("id, user_id, profiles ( display_name )")
+    .select("id, user_id, users ( display_name )")
     .eq("event_id", eventId);
 
   const participantMap = new Map(
     (participants ?? []).map((p: any) => [
       p.id,
-      p.profiles?.display_name ?? "Someone",
+      p.users?.display_name ?? "Someone",
     ])
   );
 
-  // Fetch participant quests for this event
   const participantIds = (participants ?? []).map((p: any) => p.id);
   if (participantIds.length === 0) return NextResponse.json({ activity: [] });
 
+  // Fetch participant quests for this event
   const { data: pquests } = await admin
     .from("participant_quests")
     .select("id, event_participant_id, quests ( title, points, is_legendary )")
@@ -71,10 +57,10 @@ export async function GET(request: NextRequest) {
     ])
   );
 
-  // Fetch completions for those participant quests
   const pquestIds = (pquests ?? []).map((pq: any) => pq.id);
   if (pquestIds.length === 0) return NextResponse.json({ activity: [] });
 
+  // Fetch completions
   const { data: completions, error } = await admin
     .from("quest_completions")
     .select("id, completed_at, photo_url, text_note, participant_quest_id")
@@ -84,7 +70,7 @@ export async function GET(request: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // Flatten everything together
+  // Flatten into activity items
   const activity = (completions ?? []).map((c: any) => {
     const pq = pquestMap.get(c.participant_quest_id);
     const displayName = pq ? participantMap.get(pq.event_participant_id) : "Someone";
