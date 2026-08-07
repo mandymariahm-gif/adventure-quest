@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { supabaseServer, supabaseAdmin } from "@/lib/supabase/server";
+import { supabaseAdmin } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
@@ -8,20 +8,7 @@ export async function GET(request: Request) {
   const eventId = searchParams.get("eventId");
   if (!eventId) return NextResponse.json({ error: "Missing eventId" }, { status: 400 });
 
-  const supabase = supabaseServer();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
   const admin = supabaseAdmin();
-
-  // Verify the user is a participant in this event
-  const { data: membership } = await admin
-    .from("event_participants")
-    .select("id")
-    .eq("event_id", eventId)
-    .eq("user_id", user.id)
-    .maybeSingle();
-  if (!membership) return NextResponse.json({ error: "Not a participant" }, { status: 403 });
 
   // Fetch all participants with display names from users table
   const { data: participants } = await admin
