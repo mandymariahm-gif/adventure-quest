@@ -80,10 +80,21 @@ export async function GET(request: Request) {
 
   if (sqError) return NextResponse.json({ error: sqError.message, where: "side_quests" }, { status: 500 });
 
+  const sideQuestItems = (sideQuests ?? []).map((s: any) => ({
+    id: s.id,
+    completed_at: s.created_at,
+    photo_url: s.photo_url,
+    text_note: null,
+    quest_title: s.title,
+    display_name: userMap.get(s.user_id) ?? "Someone",
+    points: 0,
+    is_legendary: false,
+    is_side_quest: true,
+  }));
+
   // Merge and sort
   const activity = [...completionItems, ...sideQuestItems]
     .sort((a, b) => new Date(b.completed_at).getTime() - new Date(a.completed_at).getTime())
     .slice(0, 80);
 
   return NextResponse.json({ activity });
-}
