@@ -10,7 +10,6 @@ export async function GET(request: Request) {
 
   const admin = supabaseAdmin();
 
-  // Fetch participants
   const { data: participants } = await admin
     .from("event_participants")
     .select("id, user_id")
@@ -18,7 +17,6 @@ export async function GET(request: Request) {
 
   if (!participants || participants.length === 0) return NextResponse.json({ activity: [] });
 
-  // Fetch display names from users table separately
   const userIds = participants.map((p) => p.user_id);
   const { data: users } = await admin
     .from("users")
@@ -29,7 +27,6 @@ export async function GET(request: Request) {
   const participantMap = new Map(participants.map((p) => [p.id, userMap.get(p.user_id) ?? "Someone"]));
   const participantIds = participants.map((p) => p.id);
 
-  // Fetch quest completions
   let completionItems: any[] = [];
   const { data: pquests } = await admin
     .from("participant_quests")
@@ -70,7 +67,6 @@ export async function GET(request: Request) {
     });
   }
 
- // Fetch side quests
   const { data: sideQuests, error: sqError } = await admin
     .from("side_quests")
     .select("id, created_at, photo_url, title, user_id")
@@ -78,23 +74,4 @@ export async function GET(request: Request) {
     .order("created_at", { ascending: false })
     .limit(50);
 
-  if (sqError) return NextResponse.json({ error: sqError.message, where: "side_quests" }, { status: 500 });
-
-  const sideQuestItems = (sideQuests ?? []).map((s: any) => ({
-    id: s.id,
-    completed_at: s.created_at,
-    photo_url: s.photo_url,
-    text_note: null,
-    quest_title: s.title,
-    display_name: userMap.get(s.user_id) ?? "Someone",
-    points: 0,
-    is_legendary: false,
-    is_side_quest: true,
-  }));
-
-  // Merge and sort
-  const activity = [...completionItems, ...sideQuestItems]
-    .sort((a, b) => new Date(b.completed_at).getTime() - new Date(a.completed_at).getTime())
-    .slice(0, 80);
-
-  return NextResponse.json({ activity });
+  if (sqError) return NextResponse.json({ error: sqError.message, where:
