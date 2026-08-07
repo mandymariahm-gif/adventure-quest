@@ -10,67 +10,64 @@ export async function GET(request: Request) {
 
   const admin = supabaseAdmin();
 
-  // Fetch all participants with display names
+  // Fetch participants
   const { data: participants } = await admin
     .from("event_participants")
-    .select("id, user_id, users ( display_name )")
+    .select("id, user_id")
     .eq("event_id", eventId);
 
-  const participantMap = new Map(
-    (participants ?? []).map((p: any) => [p.id, p.users?.display_name ?? "Someone"])
-  );
-  const userMap = new Map(
-    (participants ?? []).map((p: any) => [p.user_id, p.users?.display_name ?? "Someone"])
-  );
+  if (!participants || participants.length === 0) return NextResponse.json({ activity: [] });
 
-  const participantIds = (participants ?? []).map((p: any) => p.id);
+  // Fetch display names from users table separately
+  const userIds = participants.map((p) => p.user_id);
+  const { data: users } = await admin
+    .from("users")
+    .select("id, display_name")
+    .in("id", userIds);
+
+  const userMap = new Map((users ?? []).map((u) => [u.id, u.display_name ?? "Someone"]));
+  const participantMap = new Map(participants.map((p) => [p.id, userMap.get(p.user_id) ?? "Someone"]));
+  const participantIds = participants.map((p) => p.id);
 
   // Fetch quest completions
   let completionItems: any[] = [];
-  if (participantIds.length > 0) {
-    const { data: pquests } = await admin
-      .from("participant_quests")
-      .select("id, event_participant_id, quests ( title, points, is_legendary )")
-      .in("event_participant_id", participantIds);
+  const { data: pquests } = await admin
+    .from("participant_quests")
+    .select("id, event_participant_id, quests ( title, points, is_legendary )")
+    .in("event_participant_id", participantIds);
 
-    const pquestMap = new Map(
-      (pquests ?? []).map((pq: any) => [
-        pq.id,
-        {
-          quest_title: pq.quests?.title ?? "Quest",
-          points: pq.quests?.points ?? 0,
-          is_legendary: pq.quests?.is_legendary ?? false,
-          event_participant_id: pq.event_participant_id,
-        },
-      ])
-    );
+  const pquestMap = new Map(
+    (pquests ?? []).map((pq: any) => [pq.id, {
+      quest_title: pq.quests?.title ?? "Quest",
+      points: pq.quests?.points ?? 0,
+      is_legendary: pq.quests?.is_legendary ?? false,
+      event_participant_id: pq.event_participant_id,
+    }])
+  );
 
-    const pquestIds = (pquests ?? []).map((pq: any) => pq.id);
+  const pquestIds = (pquests ?? []).map((pq: any) => pq.id);
+  if (pquestIds.length > 0) {
+    const { data: completions } = await admin
+      .from("quest_completions")
+      .select("id, completed_at, photo_url, text_note, participant_quest_id")
+      .in("participant_quest_id", pquestIds)
+      .order("completed_at", { ascending: false })
+      .limit(50);
 
-    if (pquestIds.length > 0) {
-      const { data: completions } = await admin
-        .from("quest_completions")
-        .select("id, completed_at, photo_url, text_note, participant_quest_id")
-        .in("participant_quest_id", pquestIds)
-        .order("completed_at", { ascending: false })
-        .limit(50);
-
-      completionItems = (completions ?? []).map((c: any) => {
-        const pq = pquestMap.get(c.participant_quest_id);
-        const displayName = pq ? participantMap.get(pq.event_participant_id) : "Someone";
-        return {
-          id: c.id,
-          completed_at: c.completed_at,
-          photo_url: c.photo_url,
-          text_note: c.text_note,
-          quest_title: pq?.quest_title ?? "Quest",
-          display_name: displayName ?? "Someone",
-          points: pq?.points ?? 0,
-          is_legendary: pq?.is_legendary ?? false,
-          is_side_quest: false,
-        };
-      });
-    }
+    completionItems = (completions ?? []).map((c: any) => {
+      const pq = pquestMap.get(c.participant_quest_id);
+      return {
+        id: c.id,
+        completed_at: c.completed_at,
+        photo_url: c.photo_url,
+        text_note: c.text_note,
+        quest_title: pq?.quest_title ?? "Quest",
+        display_name: pq ? participantMap.get(pq.event_participant_id) ?? "Someone" : "Someone",
+        points: pq?.points ?? 0,
+        is_legendary: pq?.is_legendary ?? false,
+        is_side_quest: false,
+      };
+    });
   }
 
   // Fetch side quests
@@ -93,10 +90,10 @@ export async function GET(request: Request) {
     is_side_quest: true,
   }));
 
-  // Merge and sort by time descending
-  const activity = [...completionItems, ...sideQuestItems].sort(
-    (a, b) => new Date(b.completed_at).getTime() - new Date(a.completed_at).getTime()
-  ).slice(0, 80);
+  // Merge and sort
+  const activity = [...completionItems, ...sideQuestItems]
+    .sort((a, b) => new Date(b.completed_at).getTime() - new Date(a.completed_at).getTime())
+    .slice(0, 80);
 
   return NextResponse.json({ activity });
 }
