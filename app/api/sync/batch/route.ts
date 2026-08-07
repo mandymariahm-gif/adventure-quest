@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { supabaseServer, supabaseAdmin } from "@/lib/supabase/server";
+import { supabaseAdmin } from "@/lib/supabase/server";
 import type { SyncMutation } from "@/lib/types";
 
 const LEGENDARY_TRIGGER = 5;
@@ -12,15 +12,19 @@ const LEGENDARY_TRIGGER = 5;
  *    Legendary at the trigger point.
  *  Returns { applied: [...ids] } so the client can clear its queue. */
 export async function POST(request: Request) {
-  const supabase = supabaseServer();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Sign in first." }, { status: 401 });
+  // ✅ FIX — verify the Bearer token directly instead of relying on cookies
+  const authHeader = request.headers.get("authorization") ?? "";
+  const token = authHeader.replace("Bearer ", "").trim();
+  if (!token) return NextResponse.json({ error: "Sign in first." }, { status: 401 });
+
+  const admin = supabaseAdmin();
+  const { data: { user }, error: authError } = await admin.auth.getUser(token);
+  if (!user || authError) return NextResponse.json({ error: "Sign in first." }, { status: 401 });
 
   const { mutations } = (await request.json()) as { mutations: SyncMutation[] };
   if (!Array.isArray(mutations))
     return NextResponse.json({ error: "mutations array required" }, { status: 400 });
 
-  const admin = supabaseAdmin();
   const applied: string[] = [];
 
   for (const m of mutations.slice(0, 50)) {
@@ -47,36 +51,31 @@ async function applyCompletion(
   userId: string,
   m: Extract<SyncMutation, { type: "completion" }>
 ): Promise<boolean> {
-  // already applied? (retry after a dropped response)
   const { data: existing } = await admin
     .from("quest_completions").select("id").eq("id", m.id).maybeSingle();
   if (existing) return true;
 
-  // verify the quest belongs to this user and the event is still open to writes
   const { data: pq } = await admin
     .from("participant_quests")
     .select("id, status, event_participant_id, event_participants!inner(user_id, event_id, events!inner(status, ended_at))")
     .eq("id", m.participant_quest_id)
     .maybeSingle();
-  if (!pq) return true; // stale mutation for a deleted row — drop it
+  if (!pq) return true;
 
   const ep = pq.event_participants as unknown as {
     user_id: string; event_id: string; events: { status: string; ended_at: string | null };
   };
   if (ep.user_id !== userId) return false;
 
-  // Completions are locked once the event ends — but accept late syncs for
-  // actions performed before the end (offline devices coming back).
   if (ep.events.status === "ended" && ep.events.ended_at) {
-    if (new Date(m.completed_at) > new Date(ep.events.ended_at)) return true; // drop, too late
+    if (new Date(m.completed_at) > new Date(ep.events.ended_at)) return true;
   }
   if (pq.status === "completed") return true;
 
-  // photo upload
   let photoUrl: string | null = null;
   if (m.photo_base64) {
     const bytes = Buffer.from(m.photo_base64, "base64");
-    if (bytes.length > 8 * 1024 * 1024) return true; // oversized — drop rather than wedge the queue
+    if (bytes.length > 8 * 1024 * 1024) return true;
     const path = `${ep.event_id}/${m.id}.jpg`;
     const { error: upErr } = await admin.storage
       .from("photos")
@@ -98,7 +97,6 @@ async function applyCompletion(
 
   await admin.from("participant_quests").update({ status: "completed" }).eq("id", pq.id);
 
-  // server-side pool rules
   const { data: hand } = await admin
     .from("participant_quests")
     .select("id, status, quests(is_legendary)")
@@ -126,7 +124,6 @@ async function applyCompletion(
     }
   }
 
-  // achievements
   const { data: achievements } = await admin.from("achievements").select("id, code");
   const achId = (code: string) => achievements?.find((a) => a.code === code)?.id;
   const grant = async (code: string) => {
@@ -165,11 +162,10 @@ async function applyTimeCapsule(
   if (ep.user_id !== userId) return false;
 
   const ev = ep.events as unknown as { event_date: string | null; ended_at: string | null };
-  // seal until roughly next year's event
   const base = ev.event_date ? new Date(ev.event_date) : new Date(ev.ended_at ?? Date.now());
   const unlock = new Date(base);
   unlock.setFullYear(unlock.getFullYear() + 1);
-  unlock.setDate(unlock.getDate() - 7); // opens the week before next year's event
+  unlock.setDate(unlock.getDate() - 7);
 
   const { error } = await admin.from("time_capsules").upsert(
     {

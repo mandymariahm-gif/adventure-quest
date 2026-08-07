@@ -1,5 +1,6 @@
 "use client";
 import { localDB } from "./db";
+import { supabaseBrowser } from "@/lib/supabase/client";
 import type { SyncMutation } from "@/lib/types";
 
 /**
@@ -33,6 +34,12 @@ export async function flushQueue(): Promise<void> {
     const items = await localDB.queue.toArray();
     if (items.length === 0) return;
 
+    // ✅ FIX — get the session token and send it as Bearer so the
+    // server can verify the user without relying on cookies
+    const supabase = supabaseBrowser();
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) return; // not signed in, keep queue
+
     const batch: SyncMutation[] = [];
     for (const item of items) {
       if (item.type === "completion") {
@@ -46,7 +53,10 @@ export async function flushQueue(): Promise<void> {
 
     const res = await fetch("/api/sync/batch", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${session.access_token}`,
+      },
       body: JSON.stringify({ mutations: batch }),
     });
     if (!res.ok) return; // keep the queue; we'll retry on the next trigger
