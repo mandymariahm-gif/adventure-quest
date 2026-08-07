@@ -38,7 +38,7 @@ export default async function ActivityPage({ params }: { params: { eventId: stri
 
       <ActivityFeed eventId={params.eventId} />
 
-      {/* Bottom nav — matches quest board */}
+      {/* Bottom nav */}
       <nav className="fixed inset-x-0 bottom-0 border-t border-white/10 bg-pine/95 backdrop-blur" aria-label="Main">
         <div className="mx-auto flex max-w-md justify-around py-2">
           <Link className="btn-ghost !min-h-[44px] text-sm" href={`/quests/${params.eventId}`}>Quests</Link>

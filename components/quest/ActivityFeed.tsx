@@ -1,6 +1,7 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { supabaseBrowser } from "@/lib/supabase/client";
+import SideQuestSheet from "@/components/quest/SideQuestSheet";
 
 interface ActivityItem {
   id: string;
@@ -11,6 +12,7 @@ interface ActivityItem {
   display_name: string;
   points: number;
   is_legendary: boolean;
+  is_side_quest?: boolean;
 }
 
 function timeAgo(iso: string) {
@@ -24,134 +26,146 @@ export default function ActivityFeed({ eventId }: { eventId: string }) {
   const [items, setItems] = useState<ActivityItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [showSheet, setShowSheet] = useState(false);
+
+  const load = useCallback(async () => {
+    const res = await fetch(`/api/activity?eventId=${eventId}`);
+    if (res.ok) {
+      const { activity } = await res.json();
+      setItems(activity ?? []);
+    }
+    setLoading(false);
+  }, [eventId]);
 
   useEffect(() => {
-    // Initial load
-    async function load() {
-      const res = await fetch(`/api/activity?eventId=${eventId}`);
-      if (res.ok) {
-        const { activity } = await res.json();
-        setItems(activity ?? []);
-      }
-      setLoading(false);
-    }
     void load();
 
-    // Real-time subscription on quest_completions
     const supabase = supabaseBrowser();
-    const channel = supabase
+
+    // Subscribe to quest completions
+    const completionChannel = supabase
       .channel(`activity-${eventId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "quest_completions",
-        },
-        async () => {
-          // Re-fetch the full enriched list when a new completion arrives
-          const res = await fetch(`/api/activity?eventId=${eventId}`);
-          if (res.ok) {
-            const { activity } = await res.json();
-            setItems(activity ?? []);
-          }
-        }
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "quest_completions" },
+        () => void load()
       )
       .subscribe();
 
-    return () => { void supabase.removeChannel(channel); };
-  }, [eventId]);
+    // Subscribe to side quests
+    const sideQuestChannel = supabase
+      .channel(`side-quests-${eventId}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "side_quests" },
+        () => void load()
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(completionChannel);
+      void supabase.removeChannel(sideQuestChannel);
+    };
+  }, [eventId, load]);
 
   if (loading) {
-    return (
-      <div className="mt-10 text-center text-sm text-paper/50">
-        Loading activity…
-      </div>
-    );
-  }
-
-  if (items.length === 0) {
-    return (
-      <div className="mt-10 text-center">
-        <p className="text-2xl">🌙</p>
-        <p className="mt-2 text-sm text-paper/60">
-          No quests completed yet — be the first!
-        </p>
-      </div>
-    );
+    return <div className="mt-10 text-center text-sm text-paper/50">Loading activity…</div>;
   }
 
   return (
-    <ul className="mt-4 flex flex-col gap-3">
-      {items.map((item) => (
-        <li key={item.id} className="ticket p-3">
-          <button
-            className="w-full text-left"
-            onClick={() => setExpanded(expanded === item.id ? null : item.id)}
-          >
-            <div className="flex items-start gap-3">
-              {/* Photo thumbnail */}
-              <div className="relative h-14 w-14 flex-shrink-0 overflow-hidden rounded-lg bg-white/10">
-                {item.photo_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={item.photo_url}
-                    alt={`${item.display_name}'s quest photo`}
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center text-xl">
-                    {item.is_legendary ? "⭐" : "✓"}
+    <>
+      {/* Add a moment button */}
+      <button
+        className="btn-paper w-full mt-2 flex items-center justify-center gap-2"
+        onClick={() => setShowSheet(true)}
+      >
+        <span className="text-lg">📸</span>
+        <span>Add your own moment</span>
+      </button>
+
+      {items.length === 0 ? (
+        <div className="mt-10 text-center">
+          <p className="text-2xl">🌙</p>
+          <p className="mt-2 text-sm text-paper/60">
+            No quests completed yet — be the first!
+          </p>
+        </div>
+      ) : (
+        <ul className="mt-4 flex flex-col gap-3">
+          {items.map((item) => (
+            <li key={item.id} className="ticket p-3">
+              <button
+                className="w-full text-left"
+                onClick={() => setExpanded(expanded === item.id ? null : item.id)}
+              >
+                <div className="flex items-start gap-3">
+                  {/* Photo thumbnail */}
+                  <div className="relative h-14 w-14 flex-shrink-0 overflow-hidden rounded-lg bg-white/10">
+                    {item.photo_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={item.photo_url}
+                        alt={`${item.display_name}'s photo`}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-xl">
+                        {item.is_side_quest ? "📸" : item.is_legendary ? "⭐" : "✓"}
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
 
-              {/* Info */}
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-display text-sm leading-tight">
-                  {item.is_legendary ? "⭐ " : ""}{item.quest_title}
-                </p>
-                <p className="mt-0.5 text-xs text-paper/60">
-                  <span className="text-amber font-medium">{item.display_name}</span>
-                  {" · "}+{item.points} pts
-                  {" · "}{timeAgo(item.completed_at)}
-                </p>
-                {item.text_note && (
-                  <p className="mt-1 truncate text-xs italic text-paper/50">
-                    "{item.text_note}"
-                  </p>
-                )}
-              </div>
+                  {/* Info */}
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-display text-sm leading-tight">
+                      {item.is_legendary ? "⭐ " : ""}{item.quest_title}
+                    </p>
+                    <p className="mt-0.5 text-xs text-paper/60">
+                      <span className="text-amber font-medium">{item.display_name}</span>
+                      {item.is_side_quest ? " · 📸 side quest" : ` · +${item.points} pts`}
+                      {" · "}{timeAgo(item.completed_at)}
+                    </p>
+                    {item.text_note && (
+                      <p className="mt-1 truncate text-xs italic text-paper/50">
+                        "{item.text_note}"
+                      </p>
+                    )}
+                  </div>
 
-              <span className="text-ink/30 text-sm mt-1">
-                {expanded === item.id ? "▲" : "▼"}
-              </span>
-            </div>
-          </button>
+                  <span className="text-ink/30 text-sm mt-1">
+                    {expanded === item.id ? "▲" : "▼"}
+                  </span>
+                </div>
+              </button>
 
-          {/* Expanded polaroid view */}
-          {expanded === item.id && item.photo_url && (
-            <div className="mt-3 border-t border-white/10 pt-3">
-              <div className="polaroid relative mx-auto w-48"
-                style={{ ["--tilt" as never]: "-1.5deg" }}>
-                <span className="tape" aria-hidden />
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={item.photo_url}
-                  alt={item.quest_title}
-                  className="w-full"
-                />
-                <p className="polaroid-caption">{item.quest_title}</p>
-              </div>
-              {item.text_note && (
-                <p className="mt-3 text-center text-sm italic text-paper/60">
-                  "{item.text_note}"
-                </p>
+              {/* Expanded polaroid view */}
+              {expanded === item.id && item.photo_url && (
+                <div className="mt-3 border-t border-white/10 pt-3">
+                  <div className="polaroid relative mx-auto w-48"
+                    style={{ ["--tilt" as never]: "-1.5deg" }}>
+                    <span className="tape" aria-hidden />
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={item.photo_url} alt={item.quest_title} className="w-full" />
+                    <p className="polaroid-caption">{item.quest_title}</p>
+                  </div>
+                  {item.text_note && (
+                    <p className="mt-3 text-center text-sm italic text-paper/60">
+                      "{item.text_note}"
+                    </p>
+                  )}
+                </div>
               )}
-            </div>
-          )}
-        </li>
-      ))}
-    </ul>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {showSheet && (
+        <SideQuestSheet
+          eventId={eventId}
+          onClose={() => setShowSheet(false)}
+          onAdded={() => {
+            setShowSheet(false);
+            void load();
+          }}
+        />
+      )}
+    </>
   );
 }
