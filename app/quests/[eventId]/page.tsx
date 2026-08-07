@@ -58,7 +58,7 @@ export default function QuestBoard() {
   const legendaryUnlocked = completedCount >= LEGENDARY_TRIGGER;
   const doneList = quests.filter((q) => q.status === "completed");
 
-  async function drawQuests() {
+ async function drawQuests() {
     setDrawing(true);
     setError("");
 
@@ -69,9 +69,20 @@ export default function QuestBoard() {
     }
 
     try {
+      // ✅ FIX — send Bearer token so the server can verify auth
+      const { data: { session } } = await supabaseBrowser().auth.getSession();
+      if (!session?.access_token) {
+        setError("You need to be signed in to draw quests.");
+        setDrawing(false);
+        return;
+      }
+
       const res = await fetch("/api/participant-quests/draw", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session.access_token}`,
+        },
         body: JSON.stringify({ eventId }),
       });
       const data = await res.json();

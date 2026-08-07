@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
-import { supabaseServer, supabaseAdmin } from "@/lib/supabase/server";
+import { supabaseAdmin } from "@/lib/supabase/server";
 
-/** Guaranteed distribution across 10 active quests.
- *  If a category has fewer quests than the quota, extras are filled from overflow pool. */
 const CATEGORY_QUOTAS: Record<string, number> = {
   beer:         3,
   zoo:          2,
@@ -14,12 +12,16 @@ const CATEGORY_QUOTAS: Record<string, number> = {
 const TOTAL_DRAW = 10;
 
 export async function POST(request: Request) {
-  const supabase = supabaseServer();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Sign in first." }, { status: 401 });
+  // ✅ FIX — verify Bearer token directly instead of cookies
+  const authHeader = request.headers.get("authorization") ?? "";
+  const token = authHeader.replace("Bearer ", "").trim();
+  if (!token) return NextResponse.json({ error: "Sign in first." }, { status: 401 });
+
+  const admin = supabaseAdmin();
+  const { data: { user }, error: authError } = await admin.auth.getUser(token);
+  if (!user || authError) return NextResponse.json({ error: "Sign in first." }, { status: 401 });
 
   const { eventId } = await request.json();
-  const admin = supabaseAdmin();
 
   const { data: event } = await admin
     .from("events").select("id, status, quest_pack_id").eq("id", eventId).maybeSingle();
@@ -50,7 +52,6 @@ export async function POST(request: Request) {
   const regular = pool.filter((q) => !q.is_legendary);
   const legendary = shuffle(pool.filter((q) => q.is_legendary))[0] ?? null;
 
-  // Build the distributed draw
   const selected: typeof regular = [];
   const overflow: typeof regular = [];
 
@@ -74,14 +75,14 @@ export async function POST(request: Request) {
   const remaining = TOTAL_DRAW - selected.length;
   if (remaining > 0) selected.push(...shuffle(overflow).slice(0, remaining));
 
-  // All 10 are active — no queue
   const now = new Date().toISOString();
-  const rows: { event_participant_id: string; quest_id: string; status: string; activated_at: string | null }[] = selected.slice(0, TOTAL_DRAW).map((q) => ({
-    event_participant_id: participant.id,
-    quest_id: q.id,
-    status: "active",
-    activated_at: now,
-  }));
+  const rows: { event_participant_id: string; quest_id: string; status: string; activated_at: string | null }[] =
+    selected.slice(0, TOTAL_DRAW).map((q) => ({
+      event_participant_id: participant.id,
+      quest_id: q.id,
+      status: "active",
+      activated_at: now,
+    }));
 
   if (legendary) {
     rows.push({
