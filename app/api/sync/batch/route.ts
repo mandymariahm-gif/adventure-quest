@@ -67,9 +67,8 @@ async function applyCompletion(
   };
   if (ep.user_id !== userId) return false;
 
-  if (ep.events.status === "ended" && ep.events.ended_at) {
-    if (new Date(m.completed_at) > new Date(ep.events.ended_at)) return true;
-  }
+  // Block new quest completions once event is no longer active
+  if (ep.events.status !== "active") return true;
   if (pq.status === "completed") return true;
 
   let photoUrl: string | null = null;

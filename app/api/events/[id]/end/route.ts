@@ -17,8 +17,16 @@ export async function POST(_: Request, { params }: { params: { id: string } }) {
   if (event.status !== "active")
     return NextResponse.json({ error: "Event is not active." }, { status: 400 });
 
+  const now = new Date();
+  const curationEndsAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // 7 days
+
   await admin.from("events")
-    .update({ status: "ended", ended_at: new Date().toISOString() })
+    .update({
+      status: "curation",
+      ended_at: now.toISOString(),
+      curation_starts_at: now.toISOString(),
+      curation_ends_at: curationEndsAt.toISOString(),
+    })
     .eq("id", params.id);
 
   // gather everything for the scrapbook

@@ -1,6 +1,6 @@
 // Shared types mirroring the Postgres schema (see supabase/migrations)
 
-export type EventStatus = "draft" | "active" | "ended";
+export type EventStatus = "draft" | "active" | "curation" | "locked" | "archived" | "ended";
 export type ParticipantRole = "host" | "participant";
 export type ParticipantQuestStatus =
   | "drawn"
@@ -51,6 +51,9 @@ export interface EventRow {
   status: EventStatus;
   started_at: string | null;
   ended_at: string | null;
+  curation_starts_at: string | null;
+  curation_ends_at: string | null;
+  game_mode: string;
 }
 
 export interface EventParticipant {
