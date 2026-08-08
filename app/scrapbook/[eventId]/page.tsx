@@ -24,7 +24,6 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
 
   if (!event) redirect("/dashboard");
 
-  // Event hasn't ended yet — send them back to play
   if (event.status !== "ended") {
     return (
       <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-4 p-6 text-center">
@@ -38,12 +37,10 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
     );
   }
 
-  // Fetch scrapbook once, after confirming the event has ended
   const { data: scrapbook } = await admin
     .from("scrapbooks").select("stats_json, champion_user_id, generated_at")
     .eq("event_id", params.eventId).maybeSingle();
 
-  // ✅ FIX #7 — event ended but scrapbook not generated yet
   if (!scrapbook) {
     return (
       <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-4 p-6 text-center">
@@ -63,6 +60,13 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
   const { data: capsule } = await admin
     .from("time_capsules").select("id, unlock_at, favorite_beer, favorite_brewery, funniest_moment, biggest_surprise, favorite_animal, prediction_next_year, personal_goal")
     .eq("event_participant_id", membership.id).maybeSingle();
+
+  // ✅ Fetch side quests for "Spontaneous Moments" section
+  const { data: sideQuests } = await admin
+    .from("side_quests")
+    .select("id, title, photo_url, user_id, created_at, users ( display_name )")
+    .eq("event_id", params.eventId)
+    .order("created_at", { ascending: true });
 
   const photos = stats?.timeline.filter((t) => t.photo_url) ?? [];
   const champion = stats?.leaderboard[0];
@@ -124,6 +128,38 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
               </figure>
             ))}
           </div>
+        </section>
+      )}
+
+      {/* ✅ Spontaneous moments — side quests */}
+      {sideQuests && sideQuests.length > 0 && (
+        <section className="mt-10 px-5" aria-label="Spontaneous moments">
+          <h2 className="font-display text-sm uppercase tracking-[0.25em] text-ink/50">📸 Spontaneous moments</h2>
+          <p className="mt-1 text-xs text-ink/40">Side quests from the night</p>
+          <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-8">
+            {sideQuests.filter((s: any) => s.photo_url).map((s: any, i: number) => (
+              <figure key={s.id} className="polaroid relative" style={{ ["--tilt" as never]: tilts[i % tilts.length] }}>
+                <span className="tape" aria-hidden />
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={s.photo_url} alt={s.title} loading="lazy" />
+                <figcaption className="polaroid-caption">
+                  {s.title}
+                  {s.users?.display_name ? ` — ${s.users.display_name}` : ""}
+                </figcaption>
+              </figure>
+            ))}
+          </div>
+          {/* Show text-only side quests */}
+          {sideQuests.filter((s: any) => !s.photo_url).length > 0 && (
+            <ul className="mt-4 flex flex-col gap-2">
+              {sideQuests.filter((s: any) => !s.photo_url).map((s: any) => (
+                <li key={s.id} className="flex items-start gap-2 text-sm text-ink/70">
+                  <span>📸</span>
+                  <span><strong>{s.users?.display_name ?? "Someone"}</strong> — {s.title}</span>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
       )}
 

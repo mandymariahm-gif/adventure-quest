@@ -9,16 +9,14 @@ interface Props {
   onCompleted: (participantQuestId: string) => void;
 }
 
-/** Bottom sheet for completing a quest. Works fully offline:
- *  the completion (and compressed photo) is written to the local queue and
- *  syncs whenever connectivity returns. */
 export default function QuestDetailSheet({ quest, onClose, onCompleted }: Props) {
   const [note, setNote] = useState("");
   const [photo, setPhoto] = useState<Blob | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const fileRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
+  const galleryRef = useRef<HTMLInputElement>(null);
   const sheetRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -47,20 +45,26 @@ export default function QuestDetailSheet({ quest, onClose, onCompleted }: Props)
       return;
     }
     setSaving(true);
-    const mutationId = uuid();
-    await enqueue(
-      {
-        id: mutationId,
-        type: "completion",
-        participant_quest_id: quest.id,
-        text_note: note.trim() || null,
-        photo_base64: null, // filled in from the photos table at flush time
-        completed_at: new Date().toISOString(),
-      },
-      photo ?? undefined
-    );
-    window.dispatchEvent(new CustomEvent("aq:queued"));
-    onCompleted(quest.id);
+    try {
+      const mutationId = uuid();
+      await enqueue(
+        {
+          id: mutationId,
+          type: "completion",
+          participant_quest_id: quest.id,
+          text_note: note.trim() || null,
+          photo_base64: null,
+          completed_at: new Date().toISOString(),
+        },
+        photo ?? undefined
+      );
+      window.dispatchEvent(new CustomEvent("aq:queued"));
+      onCompleted(quest.id);
+    } catch (e) {
+      setError("Something went wrong — try again.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -89,17 +93,33 @@ export default function QuestDetailSheet({ quest, onClose, onCompleted }: Props)
         {quest.description && <p className="mt-3 text-sm text-ink/80">{quest.description}</p>}
 
         <div className="ticket-tear mt-4 pt-4">
+          {/* Hidden file inputs */}
           <input
-            ref={fileRef}
+            ref={cameraRef}
             type="file"
             accept="image/*"
             capture="environment"
             className="sr-only"
             onChange={(e) => pickPhoto(e.target.files?.[0])}
           />
-          <button className="btn-primary w-full" onClick={() => fileRef.current?.click()}>
-            📷 {photo ? "Retake photo" : "Add photo"}
-          </button>
+          <input
+            ref={galleryRef}
+            type="file"
+            accept="image/*"
+            className="sr-only"
+            onChange={(e) => pickPhoto(e.target.files?.[0])}
+          />
+
+          {/* ✅ Two photo buttons — camera and gallery */}
+          <div className="flex gap-2">
+            <button className="btn-primary flex-1" onClick={() => cameraRef.current?.click()}>
+              📷 {photo ? "Retake" : "Take photo"}
+            </button>
+            <button className="btn-paper flex-1" onClick={() => galleryRef.current?.click()}>
+              🖼️ {photo ? "Choose different" : "From gallery"}
+            </button>
+          </div>
+
           {preview && (
             <div className="polaroid relative mx-auto mt-4 w-48" style={{ ["--tilt" as never]: "-2deg" }}>
               <span className="tape" aria-hidden />
