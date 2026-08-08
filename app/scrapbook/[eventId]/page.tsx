@@ -4,6 +4,7 @@ import { supabaseServer, supabaseAdmin } from "@/lib/supabase/server";
 import type { ScrapbookStats } from "@/lib/types";
 import TimeCapsuleCard from "@/components/scrapbook/TimeCapsuleCard";
 import ShareButton from "@/components/scrapbook/ShareButton";
+import CurationPanel from "@/components/scrapbook/CurationPanel";
 import { getEventPermissions, formatTimeRemaining } from "@/lib/event-permissions";
 
 export const dynamic = "force-dynamic";
@@ -28,7 +29,6 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
   const isHost = event.host_id === user.id;
   const perms = getEventPermissions(event.status, event.curation_ends_at, isHost);
 
-  // Still in draft or active — not ready yet
   if (event.status === "draft" || event.status === "active") {
     return (
       <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-4 p-6 text-center">
@@ -83,6 +83,33 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
     display_name: sqUserMap.get(s.user_id) ?? "Someone",
   }));
 
+  // ✅ Phase 2 — fetch this user's completed quests without photos (for curation)
+  let missingPhotoQuests: { completionId: string; questTitle: string }[] = [];
+  if (perms.isCurationOpen) {
+    const { data: myPquests } = await admin
+      .from("participant_quests")
+      .select("id, quests(title), quest_completions(id, photo_url)")
+      .eq("event_participant_id", membership.id)
+      .eq("status", "completed");
+
+    missingPhotoQuests = (myPquests ?? [])
+      .filter((pq: any) => {
+        const completion = Array.isArray(pq.quest_completions)
+          ? pq.quest_completions[0]
+          : pq.quest_completions;
+        return completion && !completion.photo_url;
+      })
+      .map((pq: any) => {
+        const completion = Array.isArray(pq.quest_completions)
+          ? pq.quest_completions[0]
+          : pq.quest_completions;
+        return {
+          completionId: completion.id,
+          questTitle: pq.quests?.title ?? "Quest",
+        };
+      });
+  }
+
   const photos = stats?.timeline.filter((t) => t.photo_url) ?? [];
   const champion = stats?.leaderboard[0];
   const tilts = ["-2.5deg", "1.5deg", "-1deg", "2.5deg", "-1.8deg", "1deg"];
@@ -90,7 +117,6 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
   const fmtTime = (iso: string) =>
     new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 
-  // Curation time remaining
   const timeRemaining = perms.msRemaining && perms.msRemaining > 0
     ? formatTimeRemaining(perms.msRemaining)
     : null;
@@ -110,7 +136,7 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
       )}
 
       {/* Locked banner */}
-      {(event.status === "locked") && (
+      {event.status === "locked" && (
         <div className="bg-ink/5 border-b border-ink/10 px-5 py-3 text-center">
           <p className="font-display text-xs uppercase tracking-[0.25em] text-ink/50">🔒 Adventure Complete</p>
           <p className="mt-0.5 text-xs text-ink/40">Memory Week has ended. This scrapbook is now final.</p>
@@ -151,6 +177,15 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
         </section>
       )}
 
+      {/* ✅ Phase 2 — Curation panel (missing photos + add moment) */}
+      {perms.isCurationOpen && (
+        <CurationPanel
+          eventId={params.eventId}
+          missingPhotoQuests={missingPhotoQuests}
+          canAddSideQuest={perms.canAddSideQuest}
+        />
+      )}
+
       {/* photo grid */}
       {photos.length > 0 && (
         <section className="mt-8 px-5" aria-label="Photos">
@@ -171,7 +206,7 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
         </section>
       )}
 
-      {/* Spontaneous moments — side quests */}
+      {/* Spontaneous moments */}
       {sideQuests && sideQuests.length > 0 && (
         <section className="mt-10 px-5" aria-label="Spontaneous moments">
           <h2 className="font-display text-sm uppercase tracking-[0.25em] text-ink/50">📸 Spontaneous moments</h2>
