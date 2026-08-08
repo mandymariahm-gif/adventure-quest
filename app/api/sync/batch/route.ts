@@ -57,7 +57,7 @@ async function applyCompletion(
 
   const { data: pq } = await admin
     .from("participant_quests")
-    .select("id, status, event_participant_id, event_participants!inner(user_id, event_id, events!inner(status, ended_at))")
+    .select("id, status, event_participant_id, event_participants!inner(user_id, event_id, events!inner(status, ended_at, curation_ends_at))")
     .eq("id", m.participant_quest_id)
     .maybeSingle();
   if (!pq) return true;
@@ -67,8 +67,15 @@ async function applyCompletion(
   };
   if (ep.user_id !== userId) return false;
 
-  // Block new quest completions once event is no longer active
-  if (ep.events.status !== "active") return true;
+  // Allow completions during active OR curation (curation completions are flagged)
+  const isCurationCompletion = ep.events.status === "curation";
+  if (ep.events.status !== "active" && !isCurationCompletion) return true;
+
+  // During curation, check the window is still open
+  if (isCurationCompletion) {
+    const curationEndsAt = (ep.events as any).curation_ends_at;
+    if (!curationEndsAt || new Date(curationEndsAt) < new Date()) return true;
+  }
   if (pq.status === "completed") return true;
 
   let photoUrl: string | null = null;
@@ -91,6 +98,7 @@ async function applyCompletion(
     text_note: m.text_note,
     completed_at: m.completed_at,
     synced_at: new Date().toISOString(),
+    curation_completed: isCurationCompletion,
   });
   if (insErr && !insErr.message.includes("duplicate")) return false;
 

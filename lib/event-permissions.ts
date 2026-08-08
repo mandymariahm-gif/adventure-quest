@@ -4,6 +4,7 @@ export type EventState = "draft" | "active" | "curation" | "locked" | "archived"
 
 export interface EventPermissions {
   canCompleteQuests: boolean;
+  canCompleteQuestsDuringCuration: boolean;
   canUploadQuestPhoto: boolean;
   canAddSideQuest: boolean;
   canVote: boolean;
@@ -29,7 +30,8 @@ export function getEventPermissions(
   const curationStillOpen = msRemaining !== null && msRemaining > 0;
 
   return {
-    canCompleteQuests:      status === "active",
+    canCompleteQuests:              status === "active",
+    canCompleteQuestsDuringCuration: status === "curation" && curationStillOpen,
     canUploadQuestPhoto:    status === "active" || (status === "curation" && curationStillOpen),
     canAddSideQuest:        status === "curation" && curationStillOpen,
     canVote:                status === "curation" && curationStillOpen,

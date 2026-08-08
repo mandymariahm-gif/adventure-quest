@@ -83,21 +83,21 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
     display_name: sqUserMap.get(s.user_id) ?? "Someone",
   }));
 
-  // ✅ Phase 2 — fetch this user's completed quests without photos (for curation)
+  // ✅ Phase 2 — fetch this user's completed quests without photos + active quests
   let missingPhotoQuests: { completionId: string; questTitle: string }[] = [];
+  let activeQuests: { pquestId: string; questTitle: string; requiresPhoto: boolean }[] = [];
   if (perms.isCurationOpen) {
     const { data: myPquests } = await admin
       .from("participant_quests")
-      .select("id, quests(title), quest_completions(id, photo_url)")
-      .eq("event_participant_id", membership.id)
-      .eq("status", "completed");
+      .select("id, status, quests(title, requires_photo), quest_completions(id, photo_url)")
+      .eq("event_participant_id", membership.id);
 
     missingPhotoQuests = (myPquests ?? [])
       .filter((pq: any) => {
         const completion = Array.isArray(pq.quest_completions)
           ? pq.quest_completions[0]
           : pq.quest_completions;
-        return completion && !completion.photo_url;
+        return pq.status === "completed" && completion && !completion.photo_url;
       })
       .map((pq: any) => {
         const completion = Array.isArray(pq.quest_completions)
@@ -108,6 +108,14 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
           questTitle: pq.quests?.title ?? "Quest",
         };
       });
+
+    activeQuests = (myPquests ?? [])
+      .filter((pq: any) => pq.status === "active" || pq.status === "locked")
+      .map((pq: any) => ({
+        pquestId: pq.id,
+        questTitle: pq.quests?.title ?? "Quest",
+        requiresPhoto: pq.quests?.requires_photo ?? false,
+      }));
   }
 
   const photos = stats?.timeline.filter((t) => t.photo_url) ?? [];
@@ -182,6 +190,7 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
         <CurationPanel
           eventId={params.eventId}
           missingPhotoQuests={missingPhotoQuests}
+          activeQuests={activeQuests}
           canAddSideQuest={perms.canAddSideQuest}
         />
       )}
