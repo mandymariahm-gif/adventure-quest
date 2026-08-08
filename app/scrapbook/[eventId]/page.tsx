@@ -4,6 +4,7 @@ import { supabaseServer, supabaseAdmin } from "@/lib/supabase/server";
 import type { ScrapbookStats } from "@/lib/types";
 import TimeCapsuleCard from "@/components/scrapbook/TimeCapsuleCard";
 import ShareButton from "@/components/scrapbook/ShareButton";
+import { getEventPermissions, formatTimeRemaining } from "@/lib/event-permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -14,17 +15,21 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
 
   const admin = supabaseAdmin();
   const { data: membership } = await admin
-    .from("event_participants").select("id")
+    .from("event_participants").select("id, role")
     .eq("event_id", params.eventId).eq("user_id", user.id).maybeSingle();
   if (!membership) redirect("/dashboard");
 
   const { data: event } = await admin
-    .from("events").select("name, location, event_date, status, cover_photo_url")
+    .from("events").select("name, location, event_date, status, cover_photo_url, curation_ends_at, host_id")
     .eq("id", params.eventId).single();
 
   if (!event) redirect("/dashboard");
 
-  if (event.status !== "ended") {
+  const isHost = event.host_id === user.id;
+  const perms = getEventPermissions(event.status, event.curation_ends_at, isHost);
+
+  // Still in draft or active — not ready yet
+  if (event.status === "draft" || event.status === "active") {
     return (
       <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-4 p-6 text-center">
         <h1 className="text-3xl">Still being written</h1>
@@ -61,14 +66,13 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
     .from("time_capsules").select("id, unlock_at, favorite_beer, favorite_brewery, funniest_moment, biggest_surprise, favorite_animal, prediction_next_year, personal_goal")
     .eq("event_participant_id", membership.id).maybeSingle();
 
-  // ✅ Fetch side quests for "Spontaneous Moments" section
+  // Fetch side quests
   const { data: sideQuestsRaw } = await admin
     .from("side_quests")
     .select("id, title, photo_url, user_id, created_at")
     .eq("event_id", params.eventId)
     .order("created_at", { ascending: true });
 
-  // Fetch display names separately
   const sideQuestUserIds = (sideQuestsRaw ?? []).map((s: any) => s.user_id);
   const { data: sqUsers } = sideQuestUserIds.length > 0
     ? await admin.from("users").select("id, display_name").in("id", sideQuestUserIds)
@@ -86,8 +90,33 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
   const fmtTime = (iso: string) =>
     new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 
+  // Curation time remaining
+  const timeRemaining = perms.msRemaining && perms.msRemaining > 0
+    ? formatTimeRemaining(perms.msRemaining)
+    : null;
+
   return (
     <main className="mx-auto max-w-md bg-paper text-ink">
+      {/* Curation week banner */}
+      {event.status === "curation" && (
+        <div className="bg-fern/20 border-b border-fern/30 px-5 py-3 text-center">
+          <p className="font-display text-xs uppercase tracking-[0.25em] text-fern">📸 Memory Week</p>
+          <p className="mt-0.5 text-xs text-ink/60">
+            {timeRemaining
+              ? `⏳ ${timeRemaining} to add photos and memories`
+              : "Memory Week is ending soon…"}
+          </p>
+        </div>
+      )}
+
+      {/* Locked banner */}
+      {(event.status === "locked") && (
+        <div className="bg-ink/5 border-b border-ink/10 px-5 py-3 text-center">
+          <p className="font-display text-xs uppercase tracking-[0.25em] text-ink/50">🔒 Adventure Complete</p>
+          <p className="mt-0.5 text-xs text-ink/40">Memory Week has ended. This scrapbook is now final.</p>
+        </div>
+      )}
+
       {/* cover */}
       <header className="bg-pine px-5 pb-10 pt-8 text-center text-paper">
         <p className="font-display text-xs uppercase tracking-[0.35em] text-fern">The scrapbook</p>
@@ -142,7 +171,7 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
         </section>
       )}
 
-      {/* ✅ Spontaneous moments — side quests */}
+      {/* Spontaneous moments — side quests */}
       {sideQuests && sideQuests.length > 0 && (
         <section className="mt-10 px-5" aria-label="Spontaneous moments">
           <h2 className="font-display text-sm uppercase tracking-[0.25em] text-ink/50">📸 Spontaneous moments</h2>
@@ -154,19 +183,17 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={s.photo_url} alt={s.title} loading="lazy" />
                 <figcaption className="polaroid-caption">
-                  {s.title}
-                  {s.display_name ? ` — ${s.display_name}` : ""}
+                  {s.title} — {s.display_name}
                 </figcaption>
               </figure>
             ))}
           </div>
-          {/* Show text-only side quests */}
           {sideQuests.filter((s: any) => !s.photo_url).length > 0 && (
             <ul className="mt-4 flex flex-col gap-2">
               {sideQuests.filter((s: any) => !s.photo_url).map((s: any) => (
                 <li key={s.id} className="flex items-start gap-2 text-sm text-ink/70">
                   <span>📸</span>
-                  <span><strong>{s.display_name ?? "Someone"}</strong> — {s.title}</span>
+                  <span><strong>{s.display_name}</strong> — {s.title}</span>
                 </li>
               ))}
             </ul>

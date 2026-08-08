@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import QRCode from "qrcode";
 import { supabaseBrowser } from "@/lib/supabase/client";
+import { getEventPermissions, formatTimeRemaining } from "@/lib/event-permissions";
 import type { EventRow } from "@/lib/types";
 
 interface ParticipantView { id: string; role: string; users: { display_name: string | null } | null }
@@ -16,6 +17,7 @@ export default function ManageEvent() {
   const [qr, setQr] = useState("");
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [timeRemaining, setTimeRemaining] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const supabase = supabaseBrowser();
@@ -37,6 +39,22 @@ export default function ManageEvent() {
 
   useEffect(() => { void load(); const t = setInterval(load, 15000); return () => clearInterval(t); }, [load]);
 
+  // Curation countdown ticker
+  useEffect(() => {
+    if (!event?.curation_ends_at) return;
+    const tick = () => {
+      const perms = getEventPermissions(event.status, event.curation_ends_at, true);
+      if (perms.msRemaining !== null && perms.msRemaining > 0) {
+        setTimeRemaining(formatTimeRemaining(perms.msRemaining));
+      } else {
+        setTimeRemaining(null);
+      }
+    };
+    tick();
+    const t = setInterval(tick, 60000);
+    return () => clearInterval(t);
+  }, [event]);
+
   useEffect(() => {
     if (!event) return;
     const url = `${window.location.origin}/join/${event.invite_code}`;
@@ -45,12 +63,12 @@ export default function ManageEvent() {
   }, [event]);
 
   async function transition(action: "start" | "end") {
-    if (action === "end" && !confirm("End the event? This locks new quest completions and builds the scrapbook.")) return;
+    if (action === "end" && !confirm("End the event? This starts the 7-day Memory Week where participants can add photos and memories.")) return;
     setBusy(true);
     const res = await fetch(`/api/events/${id}/${action}`, { method: "POST" });
     setBusy(false);
     if (res.ok) {
-      if (action === "end") router.push(`/scrapbook/${id}`);
+      if (action === "end") void load();
       else void load();
     }
   }
@@ -64,19 +82,53 @@ export default function ManageEvent() {
 
   if (!event) return <main className="p-6 text-paper/60">Loading…</main>;
 
+  const perms = getEventPermissions(event.status, event.curation_ends_at, true);
+
+  const statusLabel = () => {
+    switch (event.status) {
+      case "draft":     return "Draft — share the invite, then start when everyone's here.";
+      case "active":    return "● Live — quests are unlocked.";
+      case "curation":  return timeRemaining
+        ? `📸 Memory Week — ${timeRemaining}`
+        : "📸 Memory Week is ending soon…";
+      case "locked":    return "🔒 Adventure Complete — Memory Week has ended.";
+      case "archived":  return "📚 Archived.";
+      case "ended":     return "Ended.";
+    }
+  };
+
   return (
     <main className="mx-auto max-w-md p-5 pb-24">
       <header className="flex items-center gap-3 py-3">
         <button onClick={() => router.push("/dashboard")} className="btn-ghost !min-h-[40px] !px-3 text-sm" aria-label="Back">←</button>
         <div>
           <h1 className="text-2xl leading-tight">{event.name}</h1>
-          <p className="text-sm text-paper/60">
-            {event.status === "draft" && "Draft — share the invite, then start when everyone's here."}
-            {event.status === "active" && "● Live — quests are unlocked."}
-            {event.status === "ended" && "Ended."}
-          </p>
+          <p className="text-sm text-paper/60">{statusLabel()}</p>
         </div>
       </header>
+
+      {/* Curation week banner */}
+      {event.status === "curation" && (
+        <div className="mb-4 rounded-xl bg-fern/20 border border-fern/30 p-4 text-center">
+          <p className="font-display text-sm uppercase tracking-[0.2em] text-fern">📸 Memory Week</p>
+          <p className="mt-1 text-sm text-paper/70">
+            Participants can add missing photos and side quest moments.
+          </p>
+          {timeRemaining && (
+            <p className="mt-2 font-display text-lg text-amber">⏳ {timeRemaining}</p>
+          )}
+        </div>
+      )}
+
+      {/* Locked banner */}
+      {event.status === "locked" && (
+        <div className="mb-4 rounded-xl bg-white/10 border border-white/20 p-4 text-center">
+          <p className="font-display text-sm uppercase tracking-[0.2em] text-paper/60">🔒 Adventure Complete</p>
+          <p className="mt-1 text-sm text-paper/70">
+            Memory Week has ended. The scrapbook is now final.
+          </p>
+        </div>
+      )}
 
       <section className="ticket p-5 text-center">
         <h2 className="font-display text-sm uppercase tracking-[0.2em] text-ink/60">Invite friends</h2>
@@ -123,11 +175,19 @@ export default function ManageEvent() {
           <>
             <a href={`/quests/${event.id}`} className="btn-primary">Open my quest board</a>
             <button className="btn-ghost" onClick={() => transition("end")} disabled={busy}>
-              End event &amp; build scrapbook
+              End event &amp; start Memory Week
             </button>
           </>
         )}
-        {event.status === "ended" && (
+        {event.status === "curation" && (
+          <>
+            <a href={`/scrapbook/${event.id}`} className="btn-primary">View scrapbook</a>
+            <p className="text-center text-xs text-paper/40">
+              Memory Week ends automatically when the timer runs out.
+            </p>
+          </>
+        )}
+        {(event.status === "locked" || event.status === "ended") && (
           <a href={`/scrapbook/${event.id}`} className="btn-primary">View scrapbook</a>
         )}
       </div>
