@@ -155,7 +155,7 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
                 <img src={s.photo_url} alt={s.title} loading="lazy" />
                 <figcaption className="polaroid-caption">
                   {s.title}
-                  {s.display_name ? ` — ${s.users.display_name}` : ""}
+                  {s.display_name ? ` — ${s.display_name}` : ""}
                 </figcaption>
               </figure>
             ))}
