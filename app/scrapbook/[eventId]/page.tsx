@@ -62,11 +62,22 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
     .eq("event_participant_id", membership.id).maybeSingle();
 
   // ✅ Fetch side quests for "Spontaneous Moments" section
-  const { data: sideQuests } = await admin
+  const { data: sideQuestsRaw } = await admin
     .from("side_quests")
-    .select("id, title, photo_url, user_id, created_at, users ( display_name )")
+    .select("id, title, photo_url, user_id, created_at")
     .eq("event_id", params.eventId)
     .order("created_at", { ascending: true });
+
+  // Fetch display names separately
+  const sideQuestUserIds = (sideQuestsRaw ?? []).map((s: any) => s.user_id);
+  const { data: sqUsers } = sideQuestUserIds.length > 0
+    ? await admin.from("users").select("id, display_name").in("id", sideQuestUserIds)
+    : { data: [] };
+  const sqUserMap = new Map((sqUsers ?? []).map((u: any) => [u.id, u.display_name ?? "Someone"]));
+  const sideQuests = (sideQuestsRaw ?? []).map((s: any) => ({
+    ...s,
+    display_name: sqUserMap.get(s.user_id) ?? "Someone",
+  }));
 
   const photos = stats?.timeline.filter((t) => t.photo_url) ?? [];
   const champion = stats?.leaderboard[0];
@@ -144,7 +155,7 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
                 <img src={s.photo_url} alt={s.title} loading="lazy" />
                 <figcaption className="polaroid-caption">
                   {s.title}
-                  {s.users?.display_name ? ` — ${s.users.display_name}` : ""}
+                  {s.display_name ? ` — ${s.users.display_name}` : ""}
                 </figcaption>
               </figure>
             ))}
@@ -155,7 +166,7 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
               {sideQuests.filter((s: any) => !s.photo_url).map((s: any) => (
                 <li key={s.id} className="flex items-start gap-2 text-sm text-ink/70">
                   <span>📸</span>
-                  <span><strong>{s.users?.display_name ?? "Someone"}</strong> — {s.title}</span>
+                  <span><strong>{s.display_name ?? "Someone"}</strong> — {s.title}</span>
                 </li>
               ))}
             </ul>
