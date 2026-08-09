@@ -103,6 +103,7 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
   const participants = (participantsRaw ?? []).map((p: any) => ({
     user_id: p.user_id,
     display_name: p.users?.display_name ?? "Someone",
+    curation_points: p.curation_points ?? 0,
   }));
 
   const photos = stats?.timeline.filter((t) => t.photo_url) ?? [];
