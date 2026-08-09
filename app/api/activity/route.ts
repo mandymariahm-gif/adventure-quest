@@ -69,27 +69,21 @@ export async function GET(request: Request) {
     });
   }
 
-  const { data: sideQuests, error: sqError } = await admin
+  // Fetch all side quests then filter in JS to bypass any PostgREST caching issues
+  const { data: allSideQuests, error: sqError } = await admin
     .from("side_quests")
     .select("id, created_at, photo_url, title, user_id, event_id")
-    .eq("event_id", eventId)
     .order("created_at", { ascending: false })
-    .limit(50);
+    .limit(200);
 
   if (sqError) {
     return NextResponse.json({ error: sqError.message, where: "side_quests" }, { status: 500 });
   }
 
-  // Temporary debug
-  return NextResponse.json({ 
-    debug: true, 
-    eventId, 
-    sideQuestsFound: sideQuests?.length ?? 0,
-    sideQuests: sideQuests ?? [],
-    participantsFound: participants.length
-  });
+  // Filter client-side to match eventId
+  const sideQuests = (allSideQuests ?? []).filter((s: any) => s.event_id === eventId);
 
-  const sideQuestItems = (sideQuests ?? []).map((s: any) => ({
+  const sideQuestItems = sideQuests.map((s: any) => ({
     id: s.id,
     completed_at: s.created_at,
     photo_url: s.photo_url,
