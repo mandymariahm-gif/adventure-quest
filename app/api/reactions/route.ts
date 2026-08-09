@@ -77,6 +77,10 @@ export async function POST(request: Request) {
       await awardCurationPoints(admin, eventId, user.id, CURATION_POINT_VALUES.REACT_TO_PHOTO, "react_to_photo");
     }
 
+// Check achievements
+  const { checkCurationAchievements } = await import("@/lib/check-achievements");
+  await checkCurationAchievements(admin, user.id, eventId);
+  
     return NextResponse.json({ action: "added" });
   }
 }

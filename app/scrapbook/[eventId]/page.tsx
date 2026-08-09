@@ -9,6 +9,7 @@ import PhotoReactions from "@/components/scrapbook/PhotoReactions";
 import PhotoStory from "@/components/scrapbook/PhotoStory";
 import CommunityAwards from "@/components/scrapbook/CommunityAwards";
 import { getEventPermissions, formatTimeRemaining } from "@/lib/event-permissions";
+import AchievementBadges from "@/components/scrapbook/AchievementBadges";
 
 export const dynamic = "force-dynamic";
 
@@ -104,6 +105,20 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
     user_id: p.user_id,
     display_name: p.users?.display_name ?? "Someone",
     curation_points: p.curation_points ?? 0,
+  }));
+
+  // Fetch current user's achievements
+  const { data: userAchievements } = await admin
+    .from("user_achievements")
+    .select("achievement_id, created_at, achievements(code, name, icon, description)")
+    .eq("user_id", user.id);
+
+  const myAchievements = (userAchievements ?? []).map((ua: any) => ({
+    code: ua.achievements?.code ?? "",
+    name: ua.achievements?.name ?? "",
+    icon: ua.achievements?.icon ?? null,
+    description: ua.achievements?.description ?? null,
+    earned_at: ua.created_at,
   }));
 
   const photos = stats?.timeline.filter((t) => t.photo_url) ?? [];
@@ -261,6 +276,11 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
       <section className="mt-10 px-5 pb-6" aria-label="Time capsule">
         <TimeCapsuleCard eventParticipantId={membership.id} existing={capsule ?? null} />
       </section>
+
+{/* Achievements */}
+      {myAchievements.length > 0 && (
+        <AchievementBadges achievements={myAchievements} displayName="Your" />
+      )}
 
       <footer className="flex flex-col gap-3 bg-pine px-5 py-8 text-center text-paper">
         <ShareButton title={`${event.name} — our scrapbook`} />

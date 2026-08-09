@@ -58,6 +58,9 @@ export async function POST(request: Request) {
   if (perms.canEarnCurationPoints) {
     await awardCurationPoints(admin2, eventId, user.id, CURATION_POINT_VALUES.ADD_SIDE_QUEST, "add_side_quest");
   }
-
+// Check achievements
+  const { checkCurationAchievements } = await import("@/lib/check-achievements");
+  await checkCurationAchievements(admin, user.id, eventId);
+  
   return NextResponse.json({ sideQuest: data });
 }

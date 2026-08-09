@@ -99,5 +99,10 @@ export async function POST(request: Request) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Check achievements
+  const { checkCurationAchievements } = await import("@/lib/check-achievements");
+  await checkCurationAchievements(admin, user.id, eventId);
+  
   return NextResponse.json({ nomination: data });
 }
