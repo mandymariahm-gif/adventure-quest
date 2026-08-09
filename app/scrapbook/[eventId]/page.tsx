@@ -98,7 +98,7 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
   // ✅ Phase 5 — fetch participants for awards voting
   const { data: participantsRaw } = await admin
     .from("event_participants")
-    .select("user_id, users(display_name)")
+    .select("user_id, curation_points, users(display_name)")
     .eq("event_id", params.eventId);
   const participants = (participantsRaw ?? []).map((p: any) => ({
     user_id: p.user_id,
@@ -234,14 +234,25 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
 
       {stats && stats.leaderboard.length > 1 && (
         <section className="mt-8 px-5" aria-label="Final standings">
-          <h2 className="font-display text-sm uppercase tracking-[0.25em] text-ink/50">Final standings</h2>
+          <h2 className="font-display text-sm uppercase tracking-[0.25em] text-ink/50">Adventure Score</h2>
+          <p className="mt-1 text-xs text-ink/40">Quest points + Memory Week bonus</p>
           <ol className="mt-2">
-            {stats.leaderboard.map((l, i) => (
-              <li key={l.user_id} className="flex justify-between border-b border-ink/10 py-2 text-sm">
-                <span>{i + 1}. {l.display_name}</span>
-                <span className="text-ink/60">{l.points} pts</span>
-              </li>
-            ))}
+            {stats.leaderboard.map((l, i) => {
+              const ep = participants.find((p) => p.user_id === l.user_id) as any;
+              const curationPts = ep?.curation_points ?? 0;
+              const total = l.points + curationPts;
+              return (
+                <li key={l.user_id} className="flex justify-between border-b border-ink/10 py-2 text-sm">
+                  <span>{i + 1}. {l.display_name}</span>
+                  <span className="text-right">
+                    <span className="font-display text-amber">{total} pts</span>
+                    {curationPts > 0 && (
+                      <span className="ml-1 text-xs text-ink/40">(+{curationPts} memory)</span>
+                    )}
+                  </span>
+                </li>
+              );
+            })}
           </ol>
         </section>
       )}
