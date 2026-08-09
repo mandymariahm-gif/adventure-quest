@@ -17,7 +17,7 @@ export default function AchievementBadges({ achievements, displayName }: Props) 
   return (
     <section className="mt-8 px-5" aria-label="Achievements">
       <h2 className="font-display text-sm uppercase tracking-[0.25em] text-ink/50">
-        🎖️ {displayName}&apos;s Achievements
+        🎖️ Achievements
       </h2>
       <div className="mt-3 flex flex-wrap gap-2">
         {achievements.map((a) => (

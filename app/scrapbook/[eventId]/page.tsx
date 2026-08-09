@@ -291,9 +291,8 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
       </section>
 
       {/* ✅ Phase 8 — Achievement Badges */}
-      <AchievementBadges achievements={myAchievements} displayName="Your" />
-      <p style={{color:"red"}}>debug: {myAchievements.length} achievements</p>
-
+      <AchievementBadges achievements={myAchievements} displayName="My" />
+      
 
       <footer className="flex flex-col gap-3 bg-pine px-5 py-8 text-center text-paper">
         <ShareButton title={`${event.name} — our scrapbook`} />
