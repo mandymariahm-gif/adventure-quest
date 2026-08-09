@@ -5,6 +5,7 @@ import type { ScrapbookStats } from "@/lib/types";
 import TimeCapsuleCard from "@/components/scrapbook/TimeCapsuleCard";
 import ShareButton from "@/components/scrapbook/ShareButton";
 import CurationPanel from "@/components/scrapbook/CurationPanel";
+import PhotoReactions from "@/components/scrapbook/PhotoReactions";
 import { getEventPermissions, formatTimeRemaining } from "@/lib/event-permissions";
 
 export const dynamic = "force-dynamic";
@@ -83,7 +84,7 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
     display_name: sqUserMap.get(s.user_id) ?? "Someone",
   }));
 
-  // ✅ Phase 2 — fetch this user's completed quests without photos + active quests
+  // Fetch curation data (missing photos + active quests)
   let missingPhotoQuests: { completionId: string; questTitle: string }[] = [];
   let activeQuests: { pquestId: string; questTitle: string; requiresPhoto: boolean }[] = [];
   if (perms.isCurationOpen) {
@@ -94,19 +95,12 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
 
     missingPhotoQuests = (myPquests ?? [])
       .filter((pq: any) => {
-        const completion = Array.isArray(pq.quest_completions)
-          ? pq.quest_completions[0]
-          : pq.quest_completions;
+        const completion = Array.isArray(pq.quest_completions) ? pq.quest_completions[0] : pq.quest_completions;
         return pq.status === "completed" && completion && !completion.photo_url;
       })
       .map((pq: any) => {
-        const completion = Array.isArray(pq.quest_completions)
-          ? pq.quest_completions[0]
-          : pq.quest_completions;
-        return {
-          completionId: completion.id,
-          questTitle: pq.quests?.title ?? "Quest",
-        };
+        const completion = Array.isArray(pq.quest_completions) ? pq.quest_completions[0] : pq.quest_completions;
+        return { completionId: completion.id, questTitle: pq.quests?.title ?? "Quest" };
       });
 
     activeQuests = (myPquests ?? [])
@@ -118,6 +112,14 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
       }));
   }
 
+  // ✅ Phase 3 — fetch all reactions for this event
+  const { data: allReactions } = await admin
+    .from("photo_reactions")
+    .select("id, photo_id, photo_type, user_id, reaction_type")
+    .eq("event_id", params.eventId);
+
+  const reactions = allReactions ?? [];
+
   const photos = stats?.timeline.filter((t) => t.photo_url) ?? [];
   const champion = stats?.leaderboard[0];
   const tilts = ["-2.5deg", "1.5deg", "-1deg", "2.5deg", "-1.8deg", "1deg"];
@@ -128,6 +130,10 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
   const timeRemaining = perms.msRemaining && perms.msRemaining > 0
     ? formatTimeRemaining(perms.msRemaining)
     : null;
+
+  // Build completion ID map from timeline for reactions
+  // We use photo_url as the photo_id for completion photos (unique per completion)
+  // and side quest id for side quest photos
 
   return (
     <main className="mx-auto max-w-md bg-paper text-ink">
@@ -185,7 +191,7 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
         </section>
       )}
 
-      {/* ✅ Phase 2 — Curation panel (missing photos + add moment) */}
+      {/* Curation panel */}
       {perms.isCurationOpen && (
         <CurationPanel
           eventId={params.eventId}
@@ -200,17 +206,33 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
         <section className="mt-8 px-5" aria-label="Photos">
           <h2 className="font-display text-sm uppercase tracking-[0.25em] text-ink/50">The pages</h2>
           <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-8">
-            {photos.map((p, i) => (
-              <figure key={i} className="polaroid relative" style={{ ["--tilt" as never]: tilts[i % tilts.length] }}>
-                <span className="tape" aria-hidden />
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={p.photo_url!} alt={`${p.display_name} — ${p.quest_title}`} loading="lazy" />
-                <figcaption className="polaroid-caption">
-                  {p.quest_title}
-                  {p.text_note ? ` — "${p.text_note}"` : ""}
-                </figcaption>
-              </figure>
-            ))}
+            {photos.map((p, i) => {
+              // Use a stable ID for the photo — we use the quest_title+display_name hash
+              // but since we don't have completion IDs in stats_json, we use photo_url as ID
+              const photoId = p.photo_url ?? `${p.display_name}-${p.quest_title}`;
+              return (
+                <div key={i} className="flex flex-col">
+                  <figure className="polaroid relative" style={{ ["--tilt" as never]: tilts[i % tilts.length] }}>
+                    <span className="tape" aria-hidden />
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={p.photo_url!} alt={`${p.display_name} — ${p.quest_title}`} loading="lazy" />
+                    <figcaption className="polaroid-caption">
+                      {p.quest_title}
+                      {p.text_note ? ` — "${p.text_note}"` : ""}
+                    </figcaption>
+                  </figure>
+                  {/* ✅ Phase 3 — reactions on quest completion photos */}
+                  <PhotoReactions
+                    photoId={photoId}
+                    photoType="completion"
+                    eventId={params.eventId}
+                    currentUserId={user.id}
+                    allReactions={reactions}
+                    canReact={perms.canVote}
+                  />
+                </div>
+              );
+            })}
           </div>
         </section>
       )}
@@ -222,14 +244,25 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
           <p className="mt-1 text-xs text-ink/40">Side quests from the night</p>
           <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-8">
             {sideQuests.filter((s: any) => s.photo_url).map((s: any, i: number) => (
-              <figure key={s.id} className="polaroid relative" style={{ ["--tilt" as never]: tilts[i % tilts.length] }}>
-                <span className="tape" aria-hidden />
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={s.photo_url} alt={s.title} loading="lazy" />
-                <figcaption className="polaroid-caption">
-                  {s.title} — {s.display_name}
-                </figcaption>
-              </figure>
+              <div key={s.id} className="flex flex-col">
+                <figure className="polaroid relative" style={{ ["--tilt" as never]: tilts[i % tilts.length] }}>
+                  <span className="tape" aria-hidden />
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={s.photo_url} alt={s.title} loading="lazy" />
+                  <figcaption className="polaroid-caption">
+                    {s.title} — {s.display_name}
+                  </figcaption>
+                </figure>
+                {/* ✅ Phase 3 — reactions on side quest photos */}
+                <PhotoReactions
+                  photoId={s.id}
+                  photoType="side_quest"
+                  eventId={params.eventId}
+                  currentUserId={user.id}
+                  allReactions={reactions}
+                  canReact={perms.canVote}
+                />
+              </div>
             ))}
           </div>
           {sideQuests.filter((s: any) => !s.photo_url).length > 0 && (
