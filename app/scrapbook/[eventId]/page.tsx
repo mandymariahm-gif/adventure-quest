@@ -110,7 +110,7 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
   // ✅ Phase 8 — fetch current user's achievements (explicit two-query join)
   const { data: userAchievementsRaw } = await admin
     .from("user_achievements")
-    .select("achievement_id, created_at")
+    .select("achievement_id, earned_at")
     .eq("user_id", user.id);
 
   const achievementIds = (userAchievementsRaw ?? []).map((ua: any) => ua.achievement_id);
@@ -129,7 +129,7 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
         name: a?.name ?? "",
         icon: a?.icon ?? null,
         description: a?.description ?? null,
-        earned_at: ua.created_at,
+        earned_at: ua.earned_at,
       };
     }).filter((a: any) => a.code !== "");
   })();
@@ -294,7 +294,7 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
       <AchievementBadges achievements={myAchievements} displayName="Your" />
       <p style={{color:"red"}}>debug: {myAchievements.length} achievements</p>
 
-      
+
       <footer className="flex flex-col gap-3 bg-pine px-5 py-8 text-center text-paper">
         <ShareButton title={`${event.name} — our scrapbook`} />
         <Link href="/dashboard" className="btn-ghost">Back to dashboard</Link>
