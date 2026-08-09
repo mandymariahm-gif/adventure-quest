@@ -107,7 +107,7 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
     curation_points: p.curation_points ?? 0,
   }));
 
-  // // Fetch current user's achievements (explicit join — FK join unreliable without registered relationship)
+  // ✅ Phase 8 — fetch current user's achievements (explicit two-query join)
   const { data: userAchievementsRaw } = await admin
     .from("user_achievements")
     .select("achievement_id, created_at")
@@ -290,7 +290,7 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
         <TimeCapsuleCard eventParticipantId={membership.id} existing={capsule ?? null} />
       </section>
 
-{/* Achievements */}
+      {/* ✅ Phase 8 — Achievement Badges */}
       {myAchievements.length > 0 && (
         <AchievementBadges achievements={myAchievements} displayName="Your" />
       )}
