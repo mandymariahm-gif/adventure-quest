@@ -7,6 +7,7 @@ import ShareButton from "@/components/scrapbook/ShareButton";
 import CurationPanel from "@/components/scrapbook/CurationPanel";
 import PhotoReactions from "@/components/scrapbook/PhotoReactions";
 import PhotoStory from "@/components/scrapbook/PhotoStory";
+import CommunityAwards from "@/components/scrapbook/CommunityAwards";
 import { getEventPermissions, formatTimeRemaining } from "@/lib/event-permissions";
 
 export const dynamic = "force-dynamic";
@@ -25,7 +26,6 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
   const { data: event } = await admin
     .from("events").select("name, location, event_date, status, cover_photo_url, curation_ends_at, host_id")
     .eq("id", params.eventId).single();
-
   if (!event) redirect("/dashboard");
 
   const isHost = event.host_id === user.id;
@@ -35,10 +35,7 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
     return (
       <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-4 p-6 text-center">
         <h1 className="text-3xl">Still being written</h1>
-        <p className="text-paper/70">
-          The scrapbook assembles itself the moment the host ends the event.
-          Until then — go make pages for it.
-        </p>
+        <p className="text-paper/70">The scrapbook assembles itself the moment the host ends the event. Until then — go make pages for it.</p>
         <Link href={`/quests/${params.eventId}`} className="btn-primary">Back to quests</Link>
       </main>
     );
@@ -52,10 +49,7 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
     return (
       <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-4 p-6 text-center">
         <h1 className="text-3xl">Assembling your scrapbook…</h1>
-        <p className="text-paper/70">
-          The night is being gathered into pages. This usually takes less than a
-          minute — refresh in a moment and it'll be ready.
-        </p>
+        <p className="text-paper/70">This usually takes less than a minute — refresh in a moment.</p>
         <Link href={`/scrapbook/${params.eventId}`} className="btn-primary">Refresh</Link>
         <Link href="/dashboard" className="btn-ghost">Back to dashboard</Link>
       </main>
@@ -68,24 +62,18 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
     .from("time_capsules").select("id, unlock_at, favorite_beer, favorite_brewery, funniest_moment, biggest_surprise, favorite_animal, prediction_next_year, personal_goal")
     .eq("event_participant_id", membership.id).maybeSingle();
 
-  // Fetch side quests
+  // Side quests
   const { data: sideQuestsRaw } = await admin
-    .from("side_quests")
-    .select("id, title, photo_url, user_id, created_at")
-    .eq("event_id", params.eventId)
-    .order("created_at", { ascending: true });
-
+    .from("side_quests").select("id, title, photo_url, user_id, created_at")
+    .eq("event_id", params.eventId).order("created_at", { ascending: true });
   const sideQuestUserIds = (sideQuestsRaw ?? []).map((s: any) => s.user_id);
   const { data: sqUsers } = sideQuestUserIds.length > 0
     ? await admin.from("users").select("id, display_name").in("id", sideQuestUserIds)
     : { data: [] };
   const sqUserMap = new Map((sqUsers ?? []).map((u: any) => [u.id, u.display_name ?? "Someone"]));
-  const sideQuests = (sideQuestsRaw ?? []).map((s: any) => ({
-    ...s,
-    display_name: sqUserMap.get(s.user_id) ?? "Someone",
-  }));
+  const sideQuests = (sideQuestsRaw ?? []).map((s: any) => ({ ...s, display_name: sqUserMap.get(s.user_id) ?? "Someone" }));
 
-  // Fetch curation data
+  // Curation data
   let missingPhotoQuests: { completionId: string; questTitle: string }[] = [];
   let activeQuests: { pquestId: string; questTitle: string; requiresPhoto: boolean }[] = [];
   if (perms.isCurationOpen) {
@@ -93,67 +81,44 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
       .from("participant_quests")
       .select("id, status, quests(title, requires_photo), quest_completions(id, photo_url)")
       .eq("event_participant_id", membership.id);
-
     missingPhotoQuests = (myPquests ?? [])
-      .filter((pq: any) => {
-        const completion = Array.isArray(pq.quest_completions) ? pq.quest_completions[0] : pq.quest_completions;
-        return pq.status === "completed" && completion && !completion.photo_url;
-      })
-      .map((pq: any) => {
-        const completion = Array.isArray(pq.quest_completions) ? pq.quest_completions[0] : pq.quest_completions;
-        return { completionId: completion.id, questTitle: pq.quests?.title ?? "Quest" };
-      });
-
+      .filter((pq: any) => { const c = Array.isArray(pq.quest_completions) ? pq.quest_completions[0] : pq.quest_completions; return pq.status === "completed" && c && !c.photo_url; })
+      .map((pq: any) => { const c = Array.isArray(pq.quest_completions) ? pq.quest_completions[0] : pq.quest_completions; return { completionId: c.id, questTitle: pq.quests?.title ?? "Quest" }; });
     activeQuests = (myPquests ?? [])
       .filter((pq: any) => pq.status === "active" || pq.status === "locked")
-      .map((pq: any) => ({
-        pquestId: pq.id,
-        questTitle: pq.quests?.title ?? "Quest",
-        requiresPhoto: pq.quests?.requires_photo ?? false,
-      }));
+      .map((pq: any) => ({ pquestId: pq.id, questTitle: pq.quests?.title ?? "Quest", requiresPhoto: pq.quests?.requires_photo ?? false }));
   }
 
-  // Fetch reactions
-  const { data: allReactions } = await admin
-    .from("photo_reactions")
-    .select("id, photo_id, photo_type, user_id, reaction_type")
-    .eq("event_id", params.eventId);
+  // Reactions & stories
+  const { data: allReactions } = await admin.from("photo_reactions").select("id, photo_id, photo_type, user_id, reaction_type").eq("event_id", params.eventId);
   const reactions = allReactions ?? [];
-
-  // ✅ Phase 4 — fetch all stories for this event
-  const { data: allStoriesRaw } = await admin
-    .from("photo_stories")
-    .select("id, photo_id, photo_type, user_id, story_text, users(display_name)")
-    .eq("event_id", params.eventId)
-    .order("created_at", { ascending: true });
+  const { data: allStoriesRaw } = await admin.from("photo_stories").select("id, photo_id, photo_type, user_id, story_text, users(display_name)").eq("event_id", params.eventId).order("created_at", { ascending: true });
   const allStories = (allStoriesRaw ?? []) as any[];
+
+  // ✅ Phase 5 — fetch participants for awards voting
+  const { data: participantsRaw } = await admin
+    .from("event_participants")
+    .select("user_id, users(display_name)")
+    .eq("event_id", params.eventId);
+  const participants = (participantsRaw ?? []).map((p: any) => ({
+    user_id: p.user_id,
+    display_name: p.users?.display_name ?? "Someone",
+  }));
 
   const photos = stats?.timeline.filter((t) => t.photo_url) ?? [];
   const champion = stats?.leaderboard[0];
   const tilts = ["-2.5deg", "1.5deg", "-1deg", "2.5deg", "-1.8deg", "1deg"];
-
-  const fmtTime = (iso: string) =>
-    new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-
-  const timeRemaining = perms.msRemaining && perms.msRemaining > 0
-    ? formatTimeRemaining(perms.msRemaining)
-    : null;
+  const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  const timeRemaining = perms.msRemaining && perms.msRemaining > 0 ? formatTimeRemaining(perms.msRemaining) : null;
 
   return (
     <main className="mx-auto max-w-md bg-paper text-ink">
-      {/* Curation week banner */}
       {event.status === "curation" && (
         <div className="bg-fern/20 border-b border-fern/30 px-5 py-3 text-center">
           <p className="font-display text-xs uppercase tracking-[0.25em] text-fern">📸 Memory Week</p>
-          <p className="mt-0.5 text-xs text-ink/60">
-            {timeRemaining
-              ? `⏳ ${timeRemaining} to add photos and memories`
-              : "Memory Week is ending soon…"}
-          </p>
+          <p className="mt-0.5 text-xs text-ink/60">{timeRemaining ? `⏳ ${timeRemaining} to add photos and memories` : "Memory Week is ending soon…"}</p>
         </div>
       )}
-
-      {/* Locked banner */}
       {event.status === "locked" && (
         <div className="bg-ink/5 border-b border-ink/10 px-5 py-3 text-center">
           <p className="font-display text-xs uppercase tracking-[0.25em] text-ink/50">🔒 Adventure Complete</p>
@@ -161,32 +126,18 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
         </div>
       )}
 
-      {/* cover */}
       <header className="bg-pine px-5 pb-10 pt-8 text-center text-paper">
         <p className="font-display text-xs uppercase tracking-[0.35em] text-fern">The scrapbook</p>
         <h1 className="mt-2 text-4xl leading-tight">{event.name}</h1>
-        <p className="mt-2 text-paper/70">
-          {event.event_date ?? ""}{event.location ? ` · ${event.location}` : ""}
-        </p>
+        <p className="mt-2 text-paper/70">{event.event_date ?? ""}{event.location ? ` · ${event.location}` : ""}</p>
       </header>
 
-      {/* stats strip */}
       <section className="ticket -mt-6 mx-5 grid grid-cols-3 gap-2 p-4 text-center">
-        <div>
-          <p className="font-display text-2xl">{stats?.total_completions ?? 0}</p>
-          <p className="text-[11px] uppercase tracking-wide text-ink/50">Quests</p>
-        </div>
-        <div>
-          <p className="font-display text-2xl">{stats?.total_photos ?? 0}</p>
-          <p className="text-[11px] uppercase tracking-wide text-ink/50">Photos</p>
-        </div>
-        <div>
-          <p className="font-display text-2xl">{stats?.participant_count ?? 0}</p>
-          <p className="text-[11px] uppercase tracking-wide text-ink/50">Friends</p>
-        </div>
+        <div><p className="font-display text-2xl">{stats?.total_completions ?? 0}</p><p className="text-[11px] uppercase tracking-wide text-ink/50">Quests</p></div>
+        <div><p className="font-display text-2xl">{stats?.total_photos ?? 0}</p><p className="text-[11px] uppercase tracking-wide text-ink/50">Photos</p></div>
+        <div><p className="font-display text-2xl">{stats?.participant_count ?? 0}</p><p className="text-[11px] uppercase tracking-wide text-ink/50">Friends</p></div>
       </section>
 
-      {/* champion */}
       {champion && (
         <section className="mx-5 mt-6 rounded-xl bg-amber/20 p-4 text-center">
           <p className="font-display text-sm uppercase tracking-[0.25em] text-ink/60">Champion</p>
@@ -195,17 +146,10 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
         </section>
       )}
 
-      {/* Curation panel */}
       {perms.isCurationOpen && (
-        <CurationPanel
-          eventId={params.eventId}
-          missingPhotoQuests={missingPhotoQuests}
-          activeQuests={activeQuests}
-          canAddSideQuest={perms.canAddSideQuest}
-        />
+        <CurationPanel eventId={params.eventId} missingPhotoQuests={missingPhotoQuests} activeQuests={activeQuests} canAddSideQuest={perms.canAddSideQuest} />
       )}
 
-      {/* photo grid */}
       {photos.length > 0 && (
         <section className="mt-8 px-5" aria-label="Photos">
           <h2 className="font-display text-sm uppercase tracking-[0.25em] text-ink/50">The pages</h2>
@@ -218,28 +162,10 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
                     <span className="tape" aria-hidden />
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={p.photo_url!} alt={`${p.display_name} — ${p.quest_title}`} loading="lazy" />
-                    <figcaption className="polaroid-caption">
-                      {p.quest_title}
-                      {p.text_note ? ` — "${p.text_note}"` : ""}
-                    </figcaption>
+                    <figcaption className="polaroid-caption">{p.quest_title}{p.text_note ? ` — "${p.text_note}"` : ""}</figcaption>
                   </figure>
-                  <PhotoReactions
-                    photoId={photoId}
-                    photoType="completion"
-                    eventId={params.eventId}
-                    currentUserId={user.id}
-                    allReactions={reactions}
-                    canReact={perms.canVote}
-                  />
-                  {/* ✅ Phase 4 — story below each photo */}
-                  <PhotoStory
-                    photoId={photoId}
-                    photoType="completion"
-                    eventId={params.eventId}
-                    currentUserId={user.id}
-                    allStories={allStories}
-                    canAddStory={perms.canAddStory}
-                  />
+                  <PhotoReactions photoId={photoId} photoType="completion" eventId={params.eventId} currentUserId={user.id} allReactions={reactions} canReact={perms.canVote} />
+                  <PhotoStory photoId={photoId} photoType="completion" eventId={params.eventId} currentUserId={user.id} allStories={allStories} canAddStory={perms.canAddStory} />
                 </div>
               );
             })}
@@ -247,7 +173,6 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
         </section>
       )}
 
-      {/* Spontaneous moments */}
       {sideQuests && sideQuests.length > 0 && (
         <section className="mt-10 px-5" aria-label="Spontaneous moments">
           <h2 className="font-display text-sm uppercase tracking-[0.25em] text-ink/50">📸 Spontaneous moments</h2>
@@ -259,27 +184,10 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
                   <span className="tape" aria-hidden />
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={s.photo_url} alt={s.title} loading="lazy" />
-                  <figcaption className="polaroid-caption">
-                    {s.title} — {s.display_name}
-                  </figcaption>
+                  <figcaption className="polaroid-caption">{s.title} — {s.display_name}</figcaption>
                 </figure>
-                <PhotoReactions
-                  photoId={s.id}
-                  photoType="side_quest"
-                  eventId={params.eventId}
-                  currentUserId={user.id}
-                  allReactions={reactions}
-                  canReact={perms.canVote}
-                />
-                {/* ✅ Phase 4 — story on side quest photos */}
-                <PhotoStory
-                  photoId={s.id}
-                  photoType="side_quest"
-                  eventId={params.eventId}
-                  currentUserId={user.id}
-                  allStories={allStories}
-                  canAddStory={perms.canAddStory}
-                />
+                <PhotoReactions photoId={s.id} photoType="side_quest" eventId={params.eventId} currentUserId={user.id} allReactions={reactions} canReact={perms.canVote} />
+                <PhotoStory photoId={s.id} photoType="side_quest" eventId={params.eventId} currentUserId={user.id} allStories={allStories} canAddStory={perms.canAddStory} />
               </div>
             ))}
           </div>
@@ -287,8 +195,7 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
             <ul className="mt-4 flex flex-col gap-2">
               {sideQuests.filter((s: any) => !s.photo_url).map((s: any) => (
                 <li key={s.id} className="flex items-start gap-2 text-sm text-ink/70">
-                  <span>📸</span>
-                  <span><strong>{s.display_name}</strong> — {s.title}</span>
+                  <span>📸</span><span><strong>{s.display_name}</strong> — {s.title}</span>
                 </li>
               ))}
             </ul>
@@ -296,7 +203,16 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
         </section>
       )}
 
-      {/* timeline */}
+      {/* ✅ Phase 5 — Community Awards */}
+      {(perms.canVote || !perms.isCurationOpen) && participants.length > 1 && (
+        <CommunityAwards
+          eventId={params.eventId}
+          currentUserId={user.id}
+          participants={participants}
+          canVote={perms.canVote}
+        />
+      )}
+
       {stats && stats.timeline.length > 0 && (
         <section className="mt-10 px-5" aria-label="Timeline">
           <h2 className="font-display text-sm uppercase tracking-[0.25em] text-ink/50">How the night went</h2>
@@ -316,7 +232,6 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
         </section>
       )}
 
-      {/* leaderboard */}
       {stats && stats.leaderboard.length > 1 && (
         <section className="mt-8 px-5" aria-label="Final standings">
           <h2 className="font-display text-sm uppercase tracking-[0.25em] text-ink/50">Final standings</h2>
@@ -331,12 +246,8 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
         </section>
       )}
 
-      {/* time capsule */}
       <section className="mt-10 px-5 pb-6" aria-label="Time capsule">
-        <TimeCapsuleCard
-          eventParticipantId={membership.id}
-          existing={capsule ?? null}
-        />
+        <TimeCapsuleCard eventParticipantId={membership.id} existing={capsule ?? null} />
       </section>
 
       <footer className="flex flex-col gap-3 bg-pine px-5 py-8 text-center text-paper">
