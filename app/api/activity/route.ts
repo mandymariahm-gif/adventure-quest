@@ -80,6 +80,15 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: sqError.message, where: "side_quests" }, { status: 500 });
   }
 
+  // Temporary debug
+  return NextResponse.json({ 
+    debug: true, 
+    eventId, 
+    sideQuestsFound: sideQuests?.length ?? 0,
+    sideQuests: sideQuests ?? [],
+    participantsFound: participants.length
+  });
+
   const sideQuestItems = (sideQuests ?? []).map((s: any) => ({
     id: s.id,
     completed_at: s.created_at,
