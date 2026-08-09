@@ -182,12 +182,32 @@ export default function ManageEvent() {
         {event.status === "curation" && (
           <>
             <a href={`/scrapbook/${event.id}`} className="btn-primary">View scrapbook</a>
+            <button
+              className="btn-ghost"
+              onClick={async () => {
+                if (!confirm("Lock Memory Week early and reveal final results?")) return;
+                setBusy(true);
+                await fetch(`/api/events/${id}/lock`, { method: "POST" });
+                setBusy(false);
+                void load();
+                window.location.href = `/reveal/${id}`;
+              }}
+              disabled={busy}
+            >
+              🔒 Lock & reveal results
+            </button>
             <p className="text-center text-xs text-paper/40">
               Memory Week ends automatically when the timer runs out.
             </p>
           </>
         )}
-        {(event.status === "locked" || event.status === "ended") && (
+        {event.status === "locked" && (
+          <>
+            <a href={`/reveal/${event.id}`} className="btn-primary">View final reveal</a>
+            <a href={`/scrapbook/${event.id}`} className="btn-ghost">View scrapbook</a>
+          </>
+        )}
+        {event.status === "ended" && (
           <a href={`/scrapbook/${event.id}`} className="btn-primary">View scrapbook</a>
         )}
       </div>
