@@ -6,6 +6,7 @@ import TimeCapsuleCard from "@/components/scrapbook/TimeCapsuleCard";
 import ShareButton from "@/components/scrapbook/ShareButton";
 import CurationPanel from "@/components/scrapbook/CurationPanel";
 import PhotoReactions from "@/components/scrapbook/PhotoReactions";
+import PhotoStory from "@/components/scrapbook/PhotoStory";
 import { getEventPermissions, formatTimeRemaining } from "@/lib/event-permissions";
 
 export const dynamic = "force-dynamic";
@@ -84,7 +85,7 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
     display_name: sqUserMap.get(s.user_id) ?? "Someone",
   }));
 
-  // Fetch curation data (missing photos + active quests)
+  // Fetch curation data
   let missingPhotoQuests: { completionId: string; questTitle: string }[] = [];
   let activeQuests: { pquestId: string; questTitle: string; requiresPhoto: boolean }[] = [];
   if (perms.isCurationOpen) {
@@ -112,13 +113,20 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
       }));
   }
 
-  // ✅ Phase 3 — fetch all reactions for this event
+  // Fetch reactions
   const { data: allReactions } = await admin
     .from("photo_reactions")
     .select("id, photo_id, photo_type, user_id, reaction_type")
     .eq("event_id", params.eventId);
-
   const reactions = allReactions ?? [];
+
+  // ✅ Phase 4 — fetch all stories for this event
+  const { data: allStoriesRaw } = await admin
+    .from("photo_stories")
+    .select("id, photo_id, photo_type, user_id, story_text, users(display_name)")
+    .eq("event_id", params.eventId)
+    .order("created_at", { ascending: true });
+  const allStories = (allStoriesRaw ?? []) as any[];
 
   const photos = stats?.timeline.filter((t) => t.photo_url) ?? [];
   const champion = stats?.leaderboard[0];
@@ -130,10 +138,6 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
   const timeRemaining = perms.msRemaining && perms.msRemaining > 0
     ? formatTimeRemaining(perms.msRemaining)
     : null;
-
-  // Build completion ID map from timeline for reactions
-  // We use photo_url as the photo_id for completion photos (unique per completion)
-  // and side quest id for side quest photos
 
   return (
     <main className="mx-auto max-w-md bg-paper text-ink">
@@ -207,8 +211,6 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
           <h2 className="font-display text-sm uppercase tracking-[0.25em] text-ink/50">The pages</h2>
           <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-8">
             {photos.map((p, i) => {
-              // Use a stable ID for the photo — we use the quest_title+display_name hash
-              // but since we don't have completion IDs in stats_json, we use photo_url as ID
               const photoId = p.photo_url ?? `${p.display_name}-${p.quest_title}`;
               return (
                 <div key={i} className="flex flex-col">
@@ -221,7 +223,6 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
                       {p.text_note ? ` — "${p.text_note}"` : ""}
                     </figcaption>
                   </figure>
-                  {/* ✅ Phase 3 — reactions on quest completion photos */}
                   <PhotoReactions
                     photoId={photoId}
                     photoType="completion"
@@ -229,6 +230,15 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
                     currentUserId={user.id}
                     allReactions={reactions}
                     canReact={perms.canVote}
+                  />
+                  {/* ✅ Phase 4 — story below each photo */}
+                  <PhotoStory
+                    photoId={photoId}
+                    photoType="completion"
+                    eventId={params.eventId}
+                    currentUserId={user.id}
+                    allStories={allStories}
+                    canAddStory={perms.canAddStory}
                   />
                 </div>
               );
@@ -253,7 +263,6 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
                     {s.title} — {s.display_name}
                   </figcaption>
                 </figure>
-                {/* ✅ Phase 3 — reactions on side quest photos */}
                 <PhotoReactions
                   photoId={s.id}
                   photoType="side_quest"
@@ -261,6 +270,15 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
                   currentUserId={user.id}
                   allReactions={reactions}
                   canReact={perms.canVote}
+                />
+                {/* ✅ Phase 4 — story on side quest photos */}
+                <PhotoStory
+                  photoId={s.id}
+                  photoType="side_quest"
+                  eventId={params.eventId}
+                  currentUserId={user.id}
+                  allStories={allStories}
+                  canAddStory={perms.canAddStory}
                 />
               </div>
             ))}
