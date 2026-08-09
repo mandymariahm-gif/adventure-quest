@@ -107,19 +107,32 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
     curation_points: p.curation_points ?? 0,
   }));
 
-  // Fetch current user's achievements
-  const { data: userAchievements } = await admin
+  // // Fetch current user's achievements (explicit join — FK join unreliable without registered relationship)
+  const { data: userAchievementsRaw } = await admin
     .from("user_achievements")
-    .select("achievement_id, created_at, achievements(code, name, icon, description)")
+    .select("achievement_id, created_at")
     .eq("user_id", user.id);
 
-  const myAchievements = (userAchievements ?? []).map((ua: any) => ({
-    code: ua.achievements?.code ?? "",
-    name: ua.achievements?.name ?? "",
-    icon: ua.achievements?.icon ?? null,
-    description: ua.achievements?.description ?? null,
-    earned_at: ua.created_at,
-  }));
+  const achievementIds = (userAchievementsRaw ?? []).map((ua: any) => ua.achievement_id);
+
+  const myAchievements = await (async () => {
+    if (achievementIds.length === 0) return [];
+    const { data: achievementData } = await admin
+      .from("achievements")
+      .select("id, code, name, icon, description")
+      .in("id", achievementIds);
+    const achievementMap = new Map((achievementData ?? []).map((a: any) => [a.id, a]));
+    return (userAchievementsRaw ?? []).map((ua: any) => {
+      const a = achievementMap.get(ua.achievement_id);
+      return {
+        code: a?.code ?? "",
+        name: a?.name ?? "",
+        icon: a?.icon ?? null,
+        description: a?.description ?? null,
+        earned_at: ua.created_at,
+      };
+    }).filter((a: any) => a.code !== "");
+  })();
 
   const photos = stats?.timeline.filter((t) => t.photo_url) ?? [];
   const champion = stats?.leaderboard[0];
