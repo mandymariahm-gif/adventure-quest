@@ -11,10 +11,10 @@ interface ExistingCapsule extends Partial<TimeCapsuleInput> {
 const FIELDS: { key: keyof TimeCapsuleInput; label: string; placeholder: string }[] = [
   { key: "favorite_beer", label: "Favorite beer tonight", placeholder: "The hazy one with the otter on the can" },
   { key: "favorite_brewery", label: "Favorite brewery", placeholder: "" },
-  { key: "funniest_moment", label: "Funniest moment", placeholder: "WhenΓÇª" },
+  { key: "funniest_moment", label: "Funniest moment", placeholder: "When" },
   { key: "biggest_surprise", label: "Biggest surprise", placeholder: "" },
   { key: "favorite_animal", label: "Favorite animal", placeholder: "" },
-  { key: "prediction_next_year", label: "Prediction for next year", placeholder: "Sealed until then ΓÇö be bold" },
+  { key: "prediction_next_year", label: "Prediction for next year", placeholder: "Sealed until then - be bold" },
   { key: "personal_goal", label: "One goal before we're back", placeholder: "" },
 ];
 
@@ -32,17 +32,17 @@ export default function TimeCapsuleCard({
     biggest_surprise: "", favorite_animal: "", prediction_next_year: "", personal_goal: "",
   });
 
-  // capsule already exists and is unlocked ΓåÆ show it
+  // capsule already exists and is unlocked -> show it
   if (existing && new Date(existing.unlock_at) <= new Date()) {
     return (
       <div className="ticket p-5">
-        <h2 className="font-display text-lg">ΓÅ│ Your Time Capsule ΓÇö unlocked</h2>
+        <h2 className="font-display text-lg">🔒 Your Time Capsule</h2>
         <dl className="mt-3 flex flex-col gap-2 text-sm">
           {FIELDS.map(({ key, label }) =>
             existing[key] ? (
               <div key={key}>
                 <dt className="text-ink/50">{label}</dt>
-                <dd className="italic">ΓÇ£{existing[key]}ΓÇ¥</dd>
+                <dd className="italic">"{existing[key]}"</dd>
               </div>
             ) : null
           )}
@@ -55,7 +55,7 @@ export default function TimeCapsuleCard({
     const unlockDate = existing ? new Date(existing.unlock_at).toLocaleDateString() : "next year";
     return (
       <div className="ticket p-5 text-center">
-        <h2 className="font-display text-lg">ΓÅ│ Time Capsule sealed</h2>
+        <h2 className="font-display text-lg"> 🔒 Time Capsule sealed</h2>
         <p className="mt-1 text-sm text-ink/60">
           Your answers are locked away until {unlockDate}. Future you says thanks.
         </p>
@@ -66,7 +66,7 @@ export default function TimeCapsuleCard({
   if (!open) {
     return (
       <div className="ticket p-5 text-center">
-        <h2 className="font-display text-lg">ΓÅ│ Seal your Time Capsule</h2>
+        <h2 className="font-display text-lg"> 🔒 Seal your Time Capsule</h2>
         <p className="mt-1 text-sm text-ink/60">
           Seven quick answers about tonight, locked until next year&apos;s event.
           The best page of the scrapbook is the one you can&apos;t read yet.
@@ -91,7 +91,7 @@ export default function TimeCapsuleCard({
 
   return (
     <div className="ticket flex flex-col gap-3 p-5">
-      <h2 className="font-display text-lg">ΓÅ│ Time Capsule</h2>
+      <h2 className="font-display text-lg">🔒 Time Capsule</h2>
       {FIELDS.map(({ key, label, placeholder }) => (
         <div key={key}>
           <label htmlFor={key} className="!text-ink/70">{label}</label>
