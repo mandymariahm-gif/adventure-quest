@@ -5,13 +5,13 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        pine: "#14291F",
-        moss: "#23402F",
-        fern: "#6FA36B",
-        amber: "#E8A33D",
-        lantern: "#F6C453",
-        paper: "#F3EAD8",
-        ink: "#1D1610",
+        pine: "var(--color-pine)",
+        moss: "var(--color-moss)",
+        fern: "var(--color-fern)",
+        amber: "var(--color-amber)",
+        lantern: "var(--color-lantern)",
+        paper: "var(--color-paper)",
+        ink: "var(--color-ink)",
       },
       fontFamily: {
         display: ["var(--font-display)"],
