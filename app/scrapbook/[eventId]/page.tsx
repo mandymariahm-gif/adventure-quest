@@ -26,7 +26,7 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
   if (!membership) redirect("/dashboard");
 
   const { data: event } = await admin
-    .from("events").select("name, location, event_date, status, cover_photo_url, curation_ends_at, host_id")
+    .from("events").select("name, location, event_date, status, cover_photo_url, curation_ends_at, host_id, game_mode")
     .eq("id", params.eventId).single();
   if (!event) redirect("/dashboard");
 
@@ -140,6 +140,10 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
   const communityPhotos = stats?.community_photos ?? [];
   const finalizedAwards = stats?.finalized_awards ?? [];
 
+  // Phase 10 — game mode
+  const gameMode = (event as any).game_mode ?? "casual";
+  const showLeaderboard = gameMode !== "memory_maker";
+
   const photos = stats?.timeline.filter((t) => t.photo_url) ?? [];
   const champion = stats?.leaderboard[0];
   const tilts = ["-2.5deg", "1.5deg", "-1deg", "2.5deg", "-1.8deg", "1deg"];
@@ -173,7 +177,7 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
         <div><p className="font-display text-2xl">{stats?.participant_count ?? 0}</p><p className="text-[11px] uppercase tracking-wide text-ink/50">Friends</p></div>
       </section>
 
-      {champion && (
+      {champion && showLeaderboard && (
         <section className="mx-5 mt-6 rounded-xl bg-amber/20 p-4 text-center">
           <p className="font-display text-sm uppercase tracking-[0.25em] text-ink/60">Champion</p>
           <p className="mt-1 font-display text-2xl">🏆 {champion.display_name}</p>
@@ -275,7 +279,7 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
         </section>
       )}
 
-      {/* All photos — locked view (no reactions/stories, read-only) */}
+      {/* All photos — locked view (read-only) */}
       {photos.length > 0 && event.status === "locked" && (
         <section className="mt-8 px-5" aria-label="All photos">
           <h2 className="font-display text-sm uppercase tracking-[0.25em] text-ink/50">The pages</h2>
@@ -372,7 +376,8 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
         </section>
       )}
 
-      {stats && stats.leaderboard.length > 1 && (
+      {/* Phase 10 — leaderboard hidden for memory_maker mode */}
+      {stats && stats.leaderboard.length > 1 && showLeaderboard && (
         <section className="mt-8 px-5" aria-label="Final standings">
           <h2 className="font-display text-sm uppercase tracking-[0.25em] text-ink/50">Adventure Score</h2>
           <p className="mt-1 text-xs text-ink/40">Quest points + Memory Week bonus</p>

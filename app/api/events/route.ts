@@ -36,6 +36,9 @@ export async function POST(request: Request) {
       participant_limit: limit,
       invite_code: inviteCode(),
       status: "draft",
+      game_mode: ["casual", "competitive", "memory_maker"].includes(body.game_mode)
+        ? body.game_mode
+        : "casual",
     })
     .select("*")
     .single();
