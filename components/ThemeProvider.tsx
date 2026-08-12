@@ -26,5 +26,12 @@ export default function ThemeProvider({
   if (theme.paper) styleVars["--color-paper"] = theme.paper;
   if (theme.ink) styleVars["--color-ink"] = theme.ink;
 
-  return <div style={styleVars as React.CSSProperties}>{children}</div>;
+  return (
+    <div
+      style={styleVars as React.CSSProperties}
+      className="min-h-dvh bg-pine"
+    >
+      {children}
+    </div>
+  );
 }
