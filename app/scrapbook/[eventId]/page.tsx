@@ -61,6 +61,17 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
 
   const stats = (scrapbook.stats_json ?? null) as ScrapbookStats | null;
 
+  // TEST — Halloween theme (temporary, we'll move this to the pack)
+  const testTheme = {
+    pine: "35 12 48",
+    moss: "58 24 74",
+    fern: "168 120 200",
+    amber: "230 126 34",
+    lantern: "241 196 15",
+    paper: "26 20 35",
+    ink: "237 224 245",
+  };
+
   const { data: capsule } = await admin
     .from("time_capsules").select("id, unlock_at, favorite_beer, favorite_brewery, funniest_moment, biggest_surprise, favorite_animal, prediction_next_year, personal_goal")
     .eq("event_participant_id", membership.id).maybeSingle();
@@ -98,7 +109,7 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
   const { data: allStoriesRaw } = await admin.from("photo_stories").select("id, photo_id, photo_type, user_id, story_text, users(display_name)").eq("event_id", params.eventId).order("created_at", { ascending: true });
   const allStories = (allStoriesRaw ?? []) as any[];
 
-  // Phase 5 — fetch participants for awards voting
+  // Phase 5 — participants for awards voting
   const { data: participantsRaw } = await admin
     .from("event_participants")
     .select("user_id, curation_points, users(display_name)")
@@ -109,7 +120,7 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
     curation_points: p.curation_points ?? 0,
   }));
 
-  // Phase 8 — fetch current user's achievements (explicit two-query join)
+  // Phase 8 — achievements (explicit two-query join)
   const { data: userAchievementsRaw } = await admin
     .from("user_achievements")
     .select("achievement_id, earned_at")
@@ -136,7 +147,7 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
     }).filter((a: any) => a.code !== "");
   })();
 
-  // Phase 9 — my adventure summary + community favorites + finalized awards
+  // Phase 9 — my adventure + community favorites + finalized awards
   const myAdventure = stats?.my_adventures?.find((a) => a.user_id === user.id) ?? null;
   const communityPhotos = stats?.community_photos ?? [];
   const finalizedAwards = stats?.finalized_awards ?? [];
@@ -191,18 +202,8 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
         <CurationPanel eventId={params.eventId} missingPhotoQuests={missingPhotoQuests} activeQuests={activeQuests} canAddSideQuest={perms.canAddSideQuest} />
       )}
 
-      {/* Phase 9 — My Adventure (locked events only) */}
+      {/* Phase 9 — My Adventure (locked only) */}
       {myAdventure && event.status === "locked" && (
-        // TEST — Halloween theme (temporary, we'll move this to the pack)
-  const testTheme = {
-    pine: "35 12 48",      // deep purple-black background
-    moss: "58 24 74",      // muted violet
-    fern: "168 120 200",   // soft lavender accents
-    amber: "230 126 34",   // pumpkin orange
-    lantern: "241 196 15", // candle gold
-    paper: "26 20 35",      // dark card background
-    ink: "237 224 245",    // pale lavender text
-  };
         <section className="mt-8 mx-5 rounded-xl bg-pine/10 border border-pine/20 p-4" aria-label="My Adventure">
           <h2 className="font-display text-sm uppercase tracking-[0.25em] text-ink/50">✨ My Adventure</h2>
           <div className="mt-3 grid grid-cols-3 gap-2 text-center">
@@ -244,7 +245,7 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
         </section>
       )}
 
-      {/* Phase 9 — Community Favorites (locked, sorted by reactions) */}
+      {/* Phase 9 — Community Favorites (locked) */}
       {communityPhotos.length > 0 && event.status === "locked" && (
         <section className="mt-8 px-5" aria-label="Community favorites">
           <h2 className="font-display text-sm uppercase tracking-[0.25em] text-ink/50">❤️ Community favorites</h2>
@@ -354,7 +355,7 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
         />
       )}
 
-      {/* Phase 9 — Finalized awards display (locked only) */}
+      {/* Phase 9 — Finalized awards (locked only) */}
       {finalizedAwards.length > 0 && event.status === "locked" && (
         <section className="mt-8 px-5" aria-label="Awards">
           <h2 className="font-display text-sm uppercase tracking-[0.25em] text-ink/50">🏅 Awards</h2>
@@ -388,7 +389,7 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
         </section>
       )}
 
-      {/* Phase 10 — leaderboard hidden for memory_maker mode */}
+      {/* Phase 10 — leaderboard hidden for memory_maker */}
       {stats && stats.leaderboard.length > 1 && showLeaderboard && (
         <section className="mt-8 px-5" aria-label="Final standings">
           <h2 className="font-display text-sm uppercase tracking-[0.25em] text-ink/50">Adventure Score</h2>
