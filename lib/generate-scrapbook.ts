@@ -91,6 +91,7 @@ export async function generateScrapbook(
     .filter((t) => t.photo_url)
     .map((t) => ({
       ...t,
+      photo_url: t.photo_url as string,
       reaction_count: reactionCountMap.get(t.photo_url!) ?? 0,
     }))
     .sort((a, b) => b.reaction_count - a.reaction_count)
