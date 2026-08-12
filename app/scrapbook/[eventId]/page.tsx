@@ -96,7 +96,7 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
   const { data: allStoriesRaw } = await admin.from("photo_stories").select("id, photo_id, photo_type, user_id, story_text, users(display_name)").eq("event_id", params.eventId).order("created_at", { ascending: true });
   const allStories = (allStoriesRaw ?? []) as any[];
 
-  // ✅ Phase 5 — fetch participants for awards voting
+  // Phase 5 — fetch participants for awards voting
   const { data: participantsRaw } = await admin
     .from("event_participants")
     .select("user_id, curation_points, users(display_name)")
@@ -107,7 +107,7 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
     curation_points: p.curation_points ?? 0,
   }));
 
-  // ✅ Phase 8 — fetch current user's achievements (explicit two-query join)
+  // Phase 8 — fetch current user's achievements (explicit two-query join)
   const { data: userAchievementsRaw } = await admin
     .from("user_achievements")
     .select("achievement_id, earned_at")
@@ -133,6 +133,11 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
       };
     }).filter((a: any) => a.code !== "");
   })();
+
+  // Phase 9 — my adventure summary + community favorites + finalized awards
+  const myAdventure = stats?.my_adventures?.find((a) => a.user_id === user.id) ?? null;
+  const communityPhotos = stats?.community_photos ?? [];
+  const finalizedAwards = stats?.finalized_awards ?? [];
 
   const photos = stats?.timeline.filter((t) => t.photo_url) ?? [];
   const champion = stats?.leaderboard[0];
@@ -179,7 +184,74 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
         <CurationPanel eventId={params.eventId} missingPhotoQuests={missingPhotoQuests} activeQuests={activeQuests} canAddSideQuest={perms.canAddSideQuest} />
       )}
 
-      {photos.length > 0 && (
+      {/* Phase 9 — My Adventure (locked events only) */}
+      {myAdventure && event.status === "locked" && (
+        <section className="mt-8 mx-5 rounded-xl bg-pine/10 border border-pine/20 p-4" aria-label="My Adventure">
+          <h2 className="font-display text-sm uppercase tracking-[0.25em] text-ink/50">✨ My Adventure</h2>
+          <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+            <div>
+              <p className="font-display text-2xl text-amber">{myAdventure.total_points}</p>
+              <p className="text-[11px] uppercase tracking-wide text-ink/50">Total pts</p>
+            </div>
+            <div>
+              <p className="font-display text-2xl">{myAdventure.quests_completed}</p>
+              <p className="text-[11px] uppercase tracking-wide text-ink/50">Quests</p>
+            </div>
+            <div>
+              <p className="font-display text-2xl">{myAdventure.photos_taken}</p>
+              <p className="text-[11px] uppercase tracking-wide text-ink/50">Photos</p>
+            </div>
+          </div>
+          {myAdventure.best_photo_url && (
+            <div className="mt-4">
+              <p className="text-xs text-ink/40 mb-2">Your most-loved photo</p>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={myAdventure.best_photo_url} alt="Your best photo" className="w-full rounded-lg object-cover max-h-48" loading="lazy" />
+              {myAdventure.best_photo_reactions > 0 && (
+                <p className="mt-1 text-xs text-ink/40 text-center">{myAdventure.best_photo_reactions} reactions</p>
+              )}
+            </div>
+          )}
+          {myAdventure.awards_won.length > 0 && (
+            <div className="mt-3">
+              <p className="text-xs text-ink/40 mb-1">Awards won</p>
+              <div className="flex flex-wrap gap-1">
+                {myAdventure.awards_won.map((a, i) => (
+                  <span key={i} className="text-xs bg-amber/20 border border-amber/30 rounded-full px-2 py-0.5">
+                    {a.emoji} {a.label}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* Phase 9 — Community Favorites (locked, sorted by reactions) */}
+      {communityPhotos.length > 0 && event.status === "locked" && (
+        <section className="mt-8 px-5" aria-label="Community favorites">
+          <h2 className="font-display text-sm uppercase tracking-[0.25em] text-ink/50">❤️ Community favorites</h2>
+          <p className="mt-1 text-xs text-ink/40">Your most-reacted photos from the night</p>
+          <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-8">
+            {communityPhotos.map((p, i) => (
+              <div key={i} className="flex flex-col">
+                <figure className="polaroid relative" style={{ ["--tilt" as never]: tilts[i % tilts.length] }}>
+                  <span className="tape" aria-hidden />
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={p.photo_url} alt={`${p.display_name} — ${p.quest_title}`} loading="lazy" />
+                  <figcaption className="polaroid-caption">{p.quest_title}</figcaption>
+                </figure>
+                {p.reaction_count > 0 && (
+                  <p className="mt-1 text-center text-xs text-ink/40">{p.reaction_count} reactions</p>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* All photos — curation view with reactions/stories */}
+      {photos.length > 0 && event.status !== "locked" && (
         <section className="mt-8 px-5" aria-label="Photos">
           <h2 className="font-display text-sm uppercase tracking-[0.25em] text-ink/50">The pages</h2>
           <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-8">
@@ -202,6 +274,25 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
         </section>
       )}
 
+      {/* All photos — locked view (no reactions/stories, read-only) */}
+      {photos.length > 0 && event.status === "locked" && (
+        <section className="mt-8 px-5" aria-label="All photos">
+          <h2 className="font-display text-sm uppercase tracking-[0.25em] text-ink/50">The pages</h2>
+          <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-8">
+            {photos.map((p, i) => (
+              <div key={i} className="flex flex-col">
+                <figure className="polaroid relative" style={{ ["--tilt" as never]: tilts[i % tilts.length] }}>
+                  <span className="tape" aria-hidden />
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={p.photo_url!} alt={`${p.display_name} — ${p.quest_title}`} loading="lazy" />
+                  <figcaption className="polaroid-caption">{p.quest_title}{p.text_note ? ` — "${p.text_note}"` : ""}</figcaption>
+                </figure>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       {sideQuests && sideQuests.length > 0 && (
         <section className="mt-10 px-5" aria-label="Spontaneous moments">
           <h2 className="font-display text-sm uppercase tracking-[0.25em] text-ink/50">📸 Spontaneous moments</h2>
@@ -215,8 +306,12 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
                   <img src={s.photo_url} alt={s.title} loading="lazy" />
                   <figcaption className="polaroid-caption">{s.title} — {s.display_name}</figcaption>
                 </figure>
-                <PhotoReactions photoId={s.id} photoType="side_quest" eventId={params.eventId} currentUserId={user.id} allReactions={reactions} canReact={perms.canVote} />
-                <PhotoStory photoId={s.id} photoType="side_quest" eventId={params.eventId} currentUserId={user.id} allStories={allStories} canAddStory={perms.canAddStory} />
+                {event.status !== "locked" && (
+                  <>
+                    <PhotoReactions photoId={s.id} photoType="side_quest" eventId={params.eventId} currentUserId={user.id} allReactions={reactions} canReact={perms.canVote} />
+                    <PhotoStory photoId={s.id} photoType="side_quest" eventId={params.eventId} currentUserId={user.id} allStories={allStories} canAddStory={perms.canAddStory} />
+                  </>
+                )}
               </div>
             ))}
           </div>
@@ -232,7 +327,7 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
         </section>
       )}
 
-      {/* ✅ Phase 5 — Community Awards */}
+      {/* Phase 5 — Community Awards voting (during curation) */}
       {(perms.canVote || !perms.isCurationOpen) && participants.length > 1 && (
         <CommunityAwards
           eventId={params.eventId}
@@ -240,6 +335,21 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
           participants={participants}
           canVote={perms.canVote}
         />
+      )}
+
+      {/* Phase 9 — Finalized awards display (locked only) */}
+      {finalizedAwards.length > 0 && event.status === "locked" && (
+        <section className="mt-8 px-5" aria-label="Awards">
+          <h2 className="font-display text-sm uppercase tracking-[0.25em] text-ink/50">🏅 Awards</h2>
+          <ul className="mt-3 flex flex-col gap-2">
+            {finalizedAwards.map((a, i) => (
+              <li key={i} className="flex items-center justify-between rounded-lg bg-amber/10 px-3 py-2 text-sm">
+                <span>{a.award_emoji} {a.award_label}</span>
+                <span className="font-display text-ink/70">{a.winner_display_name}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
 
       {stats && stats.timeline.length > 0 && (
@@ -290,9 +400,10 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
         <TimeCapsuleCard eventParticipantId={membership.id} existing={capsule ?? null} />
       </section>
 
-      {/* ✅ Phase 8 — Achievement Badges */}
-      <AchievementBadges achievements={myAchievements} displayName="My" />
-      
+      {/* Phase 8 — Achievement Badges */}
+      {myAchievements.length > 0 && (
+        <AchievementBadges achievements={myAchievements} displayName="My" />
+      )}
 
       <footer className="flex flex-col gap-3 bg-pine px-5 py-8 text-center text-paper">
         <ShareButton title={`${event.name} — our scrapbook`} />

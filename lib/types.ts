@@ -99,6 +99,35 @@ export interface ScrapbookStats {
     points: number;
     is_legendary: boolean;
   }[];
+  community_photos?: {
+    completed_at: string;
+    display_name: string;
+    quest_title: string;
+    photo_url: string;
+    text_note: string | null;
+    points: number;
+    is_legendary: boolean;
+    reaction_count: number;
+  }[];
+  finalized_awards?: {
+    award_code: string;
+    award_emoji: string;
+    award_label: string;
+    winner_user_id: string;
+    winner_display_name: string;
+  }[];
+  my_adventures?: {
+    user_id: string;
+    display_name: string;
+    quest_points: number;
+    curation_points: number;
+    total_points: number;
+    quests_completed: number;
+    photos_taken: number;
+    best_photo_url: string | null;
+    best_photo_reactions: number;
+    awards_won: { label: string; emoji: string }[];
+  }[];
 }
 
 export interface TimeCapsuleInput {
