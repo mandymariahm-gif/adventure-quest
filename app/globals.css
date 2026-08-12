@@ -15,17 +15,19 @@
 :root {
   color-scheme: dark;
 
-  /* Default theme — Brew at the Zoo */
-  --color-pine: #14291F;
-  --color-moss: #23402F;
-  --color-fern: #6FA36B;
-  --color-amber: #E8A33D;
-  --color-lantern: #F6C453;
-  --color-paper: #F3EAD8;
-  --color-ink: #1D1610;
+  /* Default theme — Brew at the Zoo (RGB channels for Tailwind alpha support) */
+  --color-pine: 20 41 31;
+  --color-moss: 35 64 47;
+  --color-fern: 111 163 107;
+  --color-amber: 232 163 61;
+  --color-lantern: 246 196 83;
+  --color-paper: 243 234 216;
+  --color-ink: 29 22 16;
 }
 
 body {
+  background-color: var(--color-pine);
+  color: var(--color-paper);
   @apply bg-pine text-paper font-body antialiased;
   background-image: radial-gradient(
       ellipse 90% 60% at 50% -10%,
@@ -51,7 +53,7 @@ h1, h2, h3 {
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: var(--color-pine); /* punch out to page background */
+  background: rgb(var(--color-pine)); /* punch out to page background */
   transform: translateY(-50%);
 }
 .ticket::before { left: -9px; }
@@ -110,7 +112,7 @@ h1, h2, h3 {
 label { @apply block text-sm font-medium text-paper/80 mb-1; }
 
 *:focus-visible {
-  outline: 3px solid var(--color-lantern);
+  outline: 3px solid rgb(var(--color-lantern));
   outline-offset: 2px;
   border-radius: 6px;
 }
