@@ -4,18 +4,15 @@ const config: Config = {
   content: ["./app/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}", "./lib/**/*.{ts,tsx}"],
   theme: {
     extend: {
-      :root {
-  color-scheme: dark;
-
-  /* Default theme — Brew at the Zoo (RGB channels for Tailwind alpha support) */
-  --color-pine: 20 41 31;
-  --color-moss: 35 64 47;
-  --color-fern: 111 163 107;
-  --color-amber: 232 163 61;
-  --color-lantern: 246 196 83;
-  --color-paper: 243 234 216;
-  --color-ink: 29 22 16;
-}
+      colors: {
+        pine: "rgb(var(--color-pine) / <alpha-value>)",
+        moss: "rgb(var(--color-moss) / <alpha-value>)",
+        fern: "rgb(var(--color-fern) / <alpha-value>)",
+        amber: "rgb(var(--color-amber) / <alpha-value>)",
+        lantern: "rgb(var(--color-lantern) / <alpha-value>)",
+        paper: "rgb(var(--color-paper) / <alpha-value>)",
+        ink: "rgb(var(--color-ink) / <alpha-value>)",
+      },
       fontFamily: {
         display: ["var(--font-display)"],
         body: ["var(--font-body)"],
