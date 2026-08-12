@@ -42,3 +42,6 @@ export default function NewEvent() {
     });
     const data = await res.json();
     if (!res.ok) {
+       </main>
+  );
+}
