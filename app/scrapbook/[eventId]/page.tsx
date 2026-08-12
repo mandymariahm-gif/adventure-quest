@@ -11,6 +11,7 @@ import CommunityAwards from "@/components/scrapbook/CommunityAwards";
 import { getEventPermissions, formatTimeRemaining } from "@/lib/event-permissions";
 import AchievementBadges from "@/components/scrapbook/AchievementBadges";
 import RegenerateButton from "@/components/scrapbook/RegenerateButton";
+import ThemeProvider from "@/components/ThemeProvider";
 
 export const dynamic = "force-dynamic";
 
@@ -151,6 +152,7 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
   const timeRemaining = perms.msRemaining && perms.msRemaining > 0 ? formatTimeRemaining(perms.msRemaining) : null;
 
   return (
+    <ThemeProvider theme={testTheme}>
     <main className="mx-auto max-w-md bg-paper text-ink">
       {event.status === "curation" && (
         <div className="bg-fern/20 border-b border-fern/30 px-5 py-3 text-center">
@@ -191,6 +193,16 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
 
       {/* Phase 9 — My Adventure (locked events only) */}
       {myAdventure && event.status === "locked" && (
+        // TEST — Halloween theme (temporary, we'll move this to the pack)
+  const testTheme = {
+    pine: "35 12 48",      // deep purple-black background
+    moss: "58 24 74",      // muted violet
+    fern: "168 120 200",   // soft lavender accents
+    amber: "230 126 34",   // pumpkin orange
+    lantern: "241 196 15", // candle gold
+    paper: "26 20 35",      // dark card background
+    ink: "237 224 245",    // pale lavender text
+  };
         <section className="mt-8 mx-5 rounded-xl bg-pine/10 border border-pine/20 p-4" aria-label="My Adventure">
           <h2 className="font-display text-sm uppercase tracking-[0.25em] text-ink/50">✨ My Adventure</h2>
           <div className="mt-3 grid grid-cols-3 gap-2 text-center">
@@ -420,5 +432,6 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
         <p className="text-xs text-paper/40">Made together. See you next year.</p>
       </footer>
     </main>
+    </ThemeProvider>
   );
 }
