@@ -4,21 +4,44 @@
 Packs are the product — themed, ready-to-run quest collections with their own look.
 Positioning: "the world's most fun disposable camera."
 
-**Status:** Phases 1–10 of the original upgrade are ✅ complete (Aug 2026).
+**Status:** Phases 1–10 of the original upgrade ✅ complete (Aug 2026).
 Event lifecycle, Memory Week curation, reactions, stories, awards, adventure score,
 final reveal, achievements, regenerated scrapbook (community favorites, My Adventure,
 finalized awards), and game modes are all live.
 
 ---
 
+## 👉 NEXT SESSION STARTS HERE
+
+**Building:** V2.5 → Quest Pack Builder (the big one).
+**First move:** paste the `quest_packs` and `quests` table schemas so the builder form
+can be designed around the real data. Get them with:
+
+```sql
+SELECT column_name, data_type FROM information_schema.columns
+WHERE table_name = 'quest_packs' ORDER BY ordinal_position;
+
+SELECT column_name, data_type FROM information_schema.columns
+WHERE table_name = 'quests' ORDER BY ordinal_position;
+```
+
+The builder needs: pack info (name, description, cover art), a quest editor
+(add / remove / reorder quests with points, category, photo-required, legendary flag),
+a theme picker (theme system already exists — see below), and API routes to save it all.
+Design note for the theme picker: it should show a live preview and flag low contrast
+(paper must contrast against pine — the header is light text on a dark banner).
+
+---
+
 ## V2.5 — Pack Business Foundation
 *The money-maker. Nothing else matters until this works.*
 
-- [ ] **Theme system (build FIRST)** — convert Tailwind fixed tokens (pine, paper, amber,
-      ink, fern, lantern) to CSS variables set per-event; packs store palette as JSON.
-      Every pack authored after this gets its theme at creation time.
-- [ ] Quest pack builder — quests, points, categories, photo requirements, legendary
-      quest, cover art, theme
+- [x] **Theme system** — palette converted to CSS variables (RGB channels); `theme_json`
+      column on quest_packs; ThemeProvider component (components/ThemeProvider.tsx) wraps
+      pages and fills the viewport with the themed background. Proven with a Halloween
+      reskin, then reverted to default. Ready for the pack builder to assign real themes.
+- [ ] **Quest pack builder** ← NEXT — quests, points, categories, photo requirements,
+      legendary quest, cover art, theme picker (with live preview + contrast check)
 - [ ] Configurable award categories per pack (replaces hardcoded beer awards)
 - [ ] Configurable time capsule questions per pack (schema migration — current columns
       are literally favorite_beer / favorite_brewery)
@@ -84,9 +107,14 @@ holiday party. Seasonal packs = natural recurring releases.
 
 ## Technical notes
 
-- Theme refactor: CSS variables on a wrapper element per event; Tailwind classes unchanged.
+- Theme: CSS variables are space-separated RGB channels (e.g. `--color-pine: 20 41 31`),
+  wrapped in tailwind.config as `rgb(var(--color-pine) / <alpha-value>)` so opacity
+  utilities (text-ink/80 etc.) work. Themes pass channel strings to ThemeProvider.
+- Theme contrast contract: `paper` must be light against a dark `pine` (header is
+  text-paper on bg-pine). The pack builder's theme picker should preview + warn.
 - Time capsule generalization requires migrating time_capsules columns to a flexible
   question/answer shape (jsonb or a capsule_answers table).
 - Stripe: one-time purchases only. No subscriptions for now.
 - Known debt: implicit Supabase FK joins are unreliable — use the explicit two-query
   pattern (see scrapbook page achievements fetch).
+- Windows encoding: watch for mangled emoji/em-dashes (ΓÇª etc.) when pasting into files.
