@@ -10,6 +10,7 @@ import PhotoStory from "@/components/scrapbook/PhotoStory";
 import CommunityAwards from "@/components/scrapbook/CommunityAwards";
 import { getEventPermissions, formatTimeRemaining } from "@/lib/event-permissions";
 import AchievementBadges from "@/components/scrapbook/AchievementBadges";
+import RegenerateButton from "@/components/scrapbook/RegenerateButton";
 
 export const dynamic = "force-dynamic";
 
@@ -406,6 +407,14 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
       )}
 
       <footer className="flex flex-col gap-3 bg-pine px-5 py-8 text-center text-paper">
+        <footer className="flex flex-col gap-3 bg-pine px-5 py-8 text-center text-paper">
+        {isHost && (event.status === "locked" || event.status === "curation") && (
+          <RegenerateButton eventId={params.eventId} />
+        )}
+        <ShareButton title={`${event.name} — our scrapbook`} />
+        <Link href="/dashboard" className="btn-ghost">Back to dashboard</Link>
+        <p className="text-xs text-paper/40">Made together. See you next year.</p>
+      </footer>
         <ShareButton title={`${event.name} — our scrapbook`} />
         <Link href="/dashboard" className="btn-ghost">Back to dashboard</Link>
         <p className="text-xs text-paper/40">Made together. See you next year.</p>
