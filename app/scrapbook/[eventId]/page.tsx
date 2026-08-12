@@ -61,16 +61,7 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
 
   const stats = (scrapbook.stats_json ?? null) as ScrapbookStats | null;
 
-  // TEST — Halloween theme (temporary, we'll move this to the pack)
-  const testTheme = {
-    pine: "35 12 48",
-    moss: "58 24 74",
-    fern: "168 120 200",
-    amber: "230 126 34",
-    lantern: "241 196 15",
-    paper: "26 20 35",
-    ink: "237 224 245",
-  };
+
 
   const { data: capsule } = await admin
     .from("time_capsules").select("id, unlock_at, favorite_beer, favorite_brewery, funniest_moment, biggest_surprise, favorite_animal, prediction_next_year, personal_goal")
@@ -163,7 +154,7 @@ export default async function ScrapbookPage({ params }: { params: { eventId: str
   const timeRemaining = perms.msRemaining && perms.msRemaining > 0 ? formatTimeRemaining(perms.msRemaining) : null;
 
   return (
-    <ThemeProvider theme={testTheme}>
+    <ThemeProvider theme={null}>
     <main className="mx-auto max-w-md bg-paper text-ink">
       {event.status === "curation" && (
         <div className="bg-fern/20 border-b border-fern/30 px-5 py-3 text-center">
