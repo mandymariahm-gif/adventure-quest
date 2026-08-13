@@ -9,7 +9,10 @@ export default function PWASetup() {
   const [online, setOnline] = useState(true);
 
   useEffect(() => {
-    if ("serviceWorker" in navigator) {
+    // Only register in production — during `npm run dev` the service worker's
+    // cache-first strategy for JS files serves stale code after every edit,
+    // fighting Next.js's hot reload. Real (deployed) usage is unaffected.
+    if (process.env.NODE_ENV === "production" && "serviceWorker" in navigator) {
       navigator.serviceWorker.register("/sw.js").catch(() => {});
     }
     registerSyncTriggers();

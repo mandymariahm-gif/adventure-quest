@@ -14,6 +14,7 @@ export interface AppUser {
   email: string | null;
   display_name: string | null;
   avatar_url: string | null;
+  is_admin: boolean;
 }
 
 export interface QuestPack {
@@ -22,6 +23,9 @@ export interface QuestPack {
   description: string | null;
   version: number;
   is_public: boolean;
+  owner_id: string | null;
+  cover_art_url: string | null;
+  theme_json: Record<string, string> | null;
 }
 
 export interface Quest {
@@ -35,6 +39,7 @@ export interface Quest {
   requires_photo: boolean;
   requires_verification: boolean;
   requires_voting: boolean;
+  position: number;
 }
 
 export interface EventRow {
