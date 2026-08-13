@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
-import type { EventRow } from "@/lib/types";
+import type { EventRow, QuestPack } from "@/lib/types";
 import InviteCodeInput from "@/components/ui/InviteCodeInput";
 
 export const dynamic = "force-dynamic";
@@ -10,6 +10,15 @@ export default async function Dashboard() {
   const supabase = supabaseServer();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/");
+
+  const { data: profile } = await supabase
+    .from("users").select("is_admin").eq("id", user.id).maybeSingle();
+  const isAdmin = Boolean(profile?.is_admin);
+
+  const { data: myPacksRaw } = isAdmin
+    ? await supabase.from("quest_packs").select("*").eq("owner_id", user.id)
+    : { data: [] as QuestPack[] };
+  const myPacks = (myPacksRaw ?? []) as QuestPack[];
 
   const { data: memberships } = await supabase
     .from("event_participants")
@@ -34,6 +43,28 @@ export default async function Dashboard() {
 
       {user.id === process.env.NEXT_PUBLIC_HOST_USER_ID && (
         <Link href="/events/new" className="btn-primary w-full">+ Create new event</Link>
+      )}
+
+      {isAdmin && (
+        <section className="mt-8">
+          <h2 className="font-display text-sm uppercase tracking-[0.25em] text-fern">Quest packs</h2>
+          <Link href="/packs/new" className="btn-paper mt-3 w-full">+ Create quest pack</Link>
+
+          {myPacks.length > 0 && (
+            <ul className="mt-3 flex flex-col gap-3">
+              {myPacks.map((p) => (
+                <li key={p.id}>
+                  <Link href={`/packs/${p.id}/edit`} className="ticket block p-4">
+                    <p className="font-display text-lg leading-tight">{p.name}</p>
+                    <p className="mt-1 text-xs uppercase tracking-wide text-ink/50">
+                      {p.is_public ? "Published" : "Private draft"} · Edit →
+                    </p>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
       )}
 
       <section className="mt-8">
