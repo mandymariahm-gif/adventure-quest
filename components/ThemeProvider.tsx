@@ -1,4 +1,4 @@
-type Theme = {
+export type Theme = {
   pine?: string;
   moss?: string;
   fern?: string;
@@ -11,9 +11,14 @@ type Theme = {
 export default function ThemeProvider({
   theme,
   children,
+  className = "min-h-dvh bg-pine",
 }: {
   theme: Theme | null;
   children: React.ReactNode;
+  /** Defaults to filling the viewport, for theming a whole page. Pass a
+   *  smaller/contained className when embedding a preview instead (e.g.
+   *  the pack builder's theme picker). */
+  className?: string;
 }) {
   if (!theme) return <>{children}</>;
 
@@ -27,10 +32,7 @@ export default function ThemeProvider({
   if (theme.ink) styleVars["--color-ink"] = theme.ink;
 
   return (
-    <div
-      style={styleVars as React.CSSProperties}
-      className="min-h-dvh bg-pine"
-    >
+    <div style={styleVars as React.CSSProperties} className={className}>
       {children}
     </div>
   );

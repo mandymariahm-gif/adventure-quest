@@ -1,4 +1,5 @@
 // Shared types mirroring the Postgres schema (see supabase/migrations)
+import type { Theme } from "@/components/ThemeProvider";
 
 export type EventStatus = "draft" | "active" | "curation" | "locked" | "archived" | "ended";
 export type ParticipantRole = "host" | "participant";
@@ -25,7 +26,7 @@ export interface QuestPack {
   is_public: boolean;
   owner_id: string | null;
   cover_art_url: string | null;
-  theme_json: Record<string, string> | null;
+  theme_json: Theme | null;
 }
 
 export interface Quest {

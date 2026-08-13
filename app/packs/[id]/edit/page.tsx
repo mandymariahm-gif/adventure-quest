@@ -2,6 +2,7 @@ import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { supabaseServer } from "@/lib/supabase/server";
 import QuestEditor from "@/components/pack-builder/QuestEditor";
+import ThemePicker from "@/components/pack-builder/ThemePicker";
 import type { Quest, QuestPack } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -38,6 +39,7 @@ export default async function EditPack({ params }: { params: { id: string } }) {
       </header>
 
       <QuestEditor packId={pack.id} initialQuests={quests ?? []} />
+      <ThemePicker packId={pack.id} initialTheme={pack.theme_json} />
     </main>
   );
 }
