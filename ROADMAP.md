@@ -13,23 +13,10 @@ finalized awards), and game modes are all live.
 
 ## 👉 NEXT SESSION STARTS HERE
 
-**Building:** V2.5 → Quest Pack Builder (the big one).
-**First move:** paste the `quest_packs` and `quests` table schemas so the builder form
-can be designed around the real data. Get them with:
-
-```sql
-SELECT column_name, data_type FROM information_schema.columns
-WHERE table_name = 'quest_packs' ORDER BY ordinal_position;
-
-SELECT column_name, data_type FROM information_schema.columns
-WHERE table_name = 'quests' ORDER BY ordinal_position;
-```
-
-The builder needs: pack info (name, description, cover art), a quest editor
-(add / remove / reorder quests with points, category, photo-required, legendary flag),
-a theme picker (theme system already exists — see below), and API routes to save it all.
-Design note for the theme picker: it should show a live preview and flag low contrast
-(paper must contrast against pine — the header is light text on a dark banner).
+**Building:** V2.5 → Configurable award categories per pack (replaces hardcoded beer awards).
+The quest pack builder (below) is done — packs can now be created and edited end to end.
+**First move:** read `community_awards`/`award_nominations` schemas and the current
+hardcoded beer-award logic before designing the per-pack config shape.
 
 ---
 
@@ -40,8 +27,15 @@ Design note for the theme picker: it should show a live preview and flag low con
       column on quest_packs; ThemeProvider component (components/ThemeProvider.tsx) wraps
       pages and fills the viewport with the themed background. Proven with a Halloween
       reskin, then reverted to default. Ready for the pack builder to assign real themes.
-- [ ] **Quest pack builder** ← NEXT — quests, points, categories, photo requirements,
-      legendary quest, cover art, theme picker (with live preview + contrast check)
+- [x] **Quest pack builder** — `/packs/new` (pack info: name, description, cover art URL)
+      → `/packs/[id]/edit` (quest editor: add/edit/delete, reorder via ↑/↓, points,
+      category, photo-required, legendary flag; theme picker: live preview reusing the
+      real ThemeProvider, WCAG contrast check/warning, save). Dashboard entry point for
+      admins. Admin-only via a real `is_admin` flag on `users` (see Technical notes) —
+      only the pack owner can edit it, enforced both in RLS and in each API route.
+      Manually tested end-to-end against the live Supabase project.
+      **Not done yet:** ThemeProvider isn't wired into live event/scrapbook pages during
+      play — a saved theme doesn't actually change what players see. Separate follow-up.
 - [ ] Configurable award categories per pack (replaces hardcoded beer awards)
 - [ ] Configurable time capsule questions per pack (schema migration — current columns
       are literally favorite_beer / favorite_brewery)
@@ -117,4 +111,13 @@ holiday party. Seasonal packs = natural recurring releases.
 - Stripe: one-time purchases only. No subscriptions for now.
 - Known debt: implicit Supabase FK joins are unreliable — use the explicit two-query
   pattern (see scrapbook page achievements fetch).
+- Admin gating: `users.is_admin` (boolean) + `is_admin()` SQL helper (mirrors the existing
+  `is_event_member()` pattern) control who can create quest packs. `quest_packs.owner_id`
+  scopes edits to the owner once a pack exists — RLS enforces both, and API routes
+  re-check ownership too since writes go through the service-role admin client (RLS
+  alone doesn't gate those). To open pack creation to non-admins later: drop the
+  `AND is_admin()` clause from the "packs insert admin only" RLS policy — the owner_id
+  scoping needs no change. `quests.position` (default 0) drives quest order within a
+  pack; the seed pack's 61 quests all started at 0 from the migration backfill, which
+  self-heals the first time anyone reorders that pack in the builder.
 - Windows encoding: watch for mangled emoji/em-dashes (ΓÇª etc.) when pasting into files.
